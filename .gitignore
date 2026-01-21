@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Outputs
+outputs/
+test_output*/
+test_images/
+results/
+raw_output.txt
+story_output.json
+_prompt_utf8.txt
+
+# Models (too large for git)
+llm_model/
+*.gguf
+*.safetensors
+
+# ComfyUI
+ComfyUI/models/
+ComfyUI/output/
+ComfyUI/input/
+ComfyUI/temp/
+ComfyUI/custom_nodes/
+
+# Supertonic
+supertonic/
+
+# llama.cpp build
+llama.cpp/build/
+llama.cpp/models/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Test files
+test_*.py
+requirements_backup.txt
