@@ -3,14 +3,17 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .config import GEN_ARGS, GRAMMAR, LLAMA_CLI, MODEL_GGUF, PROMPT_PATH, USE_GRAMMAR
+from .config import (
+    GEN_ARGS, GRAMMAR_FILE, LLAMA_CLI, GGUF_MODEL, PROMPT_PATH, USE_GRAMMAR,
+    USE_SERVER_MODE, LLAMA_SERVER_URL
+)
 
 
 def _build_command(prompt_path: Path) -> list[str]:
     cmd = [
         str(LLAMA_CLI),
         "-m",
-        str(MODEL_GGUF),
+        str(GGUF_MODEL),
         "-f",
         str(prompt_path),
         "--temp",
@@ -25,12 +28,41 @@ def _build_command(prompt_path: Path) -> list[str]:
 
     if USE_GRAMMAR:
         cmd.insert(3, "--grammar-file")
-        cmd.insert(4, str(GRAMMAR))
+        cmd.insert(4, str(GRAMMAR_FILE))
 
     return cmd
 
 
 def run_llama_stream(prompt: str, prompt_path: Optional[Path] = None) -> str:
+    """Run LLM generation using server or CLI mode
+    
+    Tries server mode first, falls back to CLI if server is unavailable
+    """
+    # Try server mode first if enabled
+    if USE_SERVER_MODE:
+        try:
+            from .llama_server_client import call_llama_server
+            
+            output = call_llama_server(
+                prompt=prompt,
+                server_url=LLAMA_SERVER_URL,
+                temperature=GEN_ARGS["temp"],
+                top_p=GEN_ARGS["top_p"],
+                n_predict=GEN_ARGS["n_predict"]
+            )
+            
+            return output
+            
+        except Exception as e:
+            import sys
+            print(f"Warning: Server mode failed ({e}), falling back to CLI mode", file=sys.stderr)
+            # Fall through to CLI mode
+    
+    # CLI mode (original implementation)
+    return _run_llama_cli(prompt, prompt_path)
+
+
+def _run_llama_cli(prompt: str, prompt_path: Optional[Path] = None) -> str:
     prompt_file = prompt_path or PROMPT_PATH
     prompt_file.write_text(prompt, encoding="utf-8")
 

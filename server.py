@@ -9,7 +9,9 @@ from typing import Optional
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
+from pathlib import Path
 
 from models import (
     FieldType,
@@ -39,16 +41,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files (for frontend)
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+# Add validation error handler to debug 422 errors
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    import logging
+    logger = logging.getLogger("uvicorn")
+    logger.error(f"Validation error for {request.url}: {exc.errors()}")
+    logger.error(f"Request body: {await request.body()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": str(await request.body())}
+    )
+
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Serve frontend or health check"""
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
     return {"status": "ok", "version": "2.0.0"}
 
 
 @app.post("/api/stt/field", response_model=FieldSTTResponse)
 async def field_stt(
-    audio_file: UploadFile = File(...),
+    audio_file: UploadFile = File(..., alias="audio_file"),
     field_type: str = Form(...),
     language: str = Form(default="ko-KR")
 ):
@@ -57,20 +83,33 @@ async def field_stt(
     
     Accepts audio file and converts to text with field-specific parsing
     """
+    import logging
+    logger = logging.getLogger("uvicorn")
+    
+    logger.info(f"STT request - field_type: {field_type}, file: {audio_file.filename if audio_file else 'None'}")
+    
     # Validate field type
     try:
         field_type_enum = FieldType(field_type)
-    except ValueError:
+    except ValueError as e:
+        logger.error(f"Invalid field_type: {field_type}, error: {e}")
         raise HTTPException(
             status_code=400,
             detail=f"Invalid field_type. Must be one of: {[ft.value for ft in FieldType]}"
         )
     
     # Read audio file
-    audio_data = await audio_file.read()
+    try:
+        audio_data = await audio_file.read()
+    except Exception as e:
+        logger.error(f"Failed to read audio file: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to read audio file: {str(e)}")
     
     if not audio_data:
+        logger.error("Empty audio file received")
         raise HTTPException(status_code=400, detail="Empty audio file")
+    
+    logger.info(f"Audio data size: {len(audio_data)} bytes")
     
     # Process STT
     try:
@@ -80,12 +119,15 @@ async def field_stt(
             language
         )
         
+        logger.info(f"STT result - text: {stt_text}, parsed: {parsed_value}, confidence: {confidence}")
+        
         return FieldSTTResponse(
             stt_text=stt_text,
             parsed_value=parsed_value,
             confidence=confidence
         )
     except Exception as e:
+        logger.error(f"STT processing failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"STT processing failed: {str(e)}")
 
 

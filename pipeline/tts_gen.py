@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 
-def generate_tts(text: str, output_path: Path, voice: str = "M1", lang: str = "ko", speed: float = 1.05):
+def generate_tts(text: str, output_path: Path, voice: str = "M2", lang: str = "ko", speed: float = 1.05):
     """Generate TTS audio using Supertonic
     
     Args:
@@ -47,7 +47,7 @@ def generate_tts(text: str, output_path: Path, voice: str = "M1", lang: str = "k
     style = load_voice_style([str(voice_style_path)], verbose=False)
     
     # Generate speech
-    wav, duration = text_to_speech(text, lang, style, total_step=5, speed=speed)
+    wav, duration = text_to_speech(text, lang, style, total_step=10, speed=speed)
     
     # Save to file
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -55,7 +55,7 @@ def generate_tts(text: str, output_path: Path, voice: str = "M1", lang: str = "k
     sf.write(str(output_path), wav[0, :trim_len], text_to_speech.sample_rate)
 
 
-def generate_page_audio(text: str, page_num: int, output_dir: Path, voice: str = "M1", lang: str = "ko"):
+def generate_page_audio(text: str, page_num: int, output_dir: Path, voice: str = "M2", lang: str = "ko"):
     """Generate audio for a single page
     
     Args:

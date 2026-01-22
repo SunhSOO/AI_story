@@ -106,8 +106,8 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             "ready_max_audio_page": run_state.ready_max_audio_page
         })
         
-        # Stage 2-7: Generate images and TTS in parallel
-        # This allows GPU (images) and CPU (TTS) to work simultaneously
+        # Stage 2-7: Generate images and TTS in true parallel
+        # This allows GPU (images) and CPU (TTS) to work simultaneously from the start
         run_state.stage = Stage.COVER
         await run_manager.emit_event(run_id, {
             "status": run_state.status.value,
@@ -116,73 +116,90 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             "ready_max_audio_page": run_state.ready_max_audio_page
         })
         
-        # Prepare image generation task
-        async def generate_images():
-            """Generate all images"""
-            filenames = await loop.run_in_executor(
+        # Import for image generation
+        from pipeline.image_gen import ComfyUIClient, generate_panel_image
+        import random
+        
+        # Generate random seed for consistency
+        base_seed = random.randint(1000000, 9999999)
+        
+        # Prepare all image generation tasks
+        async def generate_single_image(page_num: int, prompt: str, seed: int):
+            """Generate a single image"""
+            filename = f"cover.png" if page_num == 0 else f"panel_{page_num}.png"
+            output_path = run_dir / filename
+            
+            await loop.run_in_executor(
                 None,
-                generate_story_images,
-                cover_prompt,
-                panel_descriptions,
-                run_dir,
-                workflow_path
+                generate_panel_image,
+                prompt,
+                seed,
+                output_path,
+                workflow_path,
+                ComfyUIClient()
             )
             
-            # Update URLs as images complete
-            for page_num, filename in filenames.items():
-                run_state.set_page_image(page_num, filename)
-                
-                # Update stage for panels
-                if page_num == 1:
-                    run_state.stage = Stage.PANEL_1
-                elif page_num == 2:
-                    run_state.stage = Stage.PANEL_2
-                elif page_num == 3:
-                    run_state.stage = Stage.PANEL_3
-                elif page_num == 4:
-                    run_state.stage = Stage.PANEL_4
-                
-                await run_manager.emit_event(run_id, {
-                    "status": run_state.status.value,
-                    "stage": run_state.stage.value,
-                    "ready_max_page": run_state.ready_max_page,
-                    "ready_max_audio_page": run_state.ready_max_audio_page
-                })
+            run_state.set_page_image(page_num, filename)
+            
+            # Update stage
+            if page_num == 0:
+                run_state.stage = Stage.COVER
+            elif page_num == 1:
+                run_state.stage = Stage.PANEL_1
+            elif page_num == 2:
+                run_state.stage = Stage.PANEL_2
+            elif page_num == 3:
+                run_state.stage = Stage.PANEL_3
+            elif page_num == 4:
+                run_state.stage = Stage.PANEL_4
+            
+            await run_manager.emit_event(run_id, {
+                "status": run_state.status.value,
+                "stage": run_state.stage.value,
+                "ready_max_page": run_state.ready_max_page,
+                "ready_max_audio_page": run_state.ready_max_audio_page
+            })
         
-        # Prepare TTS generation task
-        async def generate_audio():
-            """Generate all audio"""
-            if not run_state.tts_enabled:
+        # Prepare all audio generation tasks
+        async def generate_single_audio(page_num: int, text: str):
+            """Generate a single audio"""
+            if not run_state.tts_enabled or not text.strip():
                 return
                 
-            # Use title for cover, summary for story panels
-            audio_texts = [cover_title] + [p.get("summary", "") for p in story_panels[:4]]
+            filename = await loop.run_in_executor(
+                None,
+                generate_page_audio,
+                text,
+                page_num,
+                run_dir,
+                "M2",
+                "ko"
+            )
             
-            for page_num, text in enumerate(audio_texts):
-                if text.strip():
-                    filename = await loop.run_in_executor(
-                        None,
-                        generate_page_audio,
-                        text,
-                        page_num,
-                        run_dir,
-                        "M1",
-                        "ko"
-                    )
-                    run_state.set_page_audio(page_num, filename)
-                    
-                    await run_manager.emit_event(run_id, {
-                        "status": run_state.status.value,
-                        "stage": run_state.stage.value,
-                        "ready_max_page": run_state.ready_max_page,
-                        "ready_max_audio_page": run_state.ready_max_audio_page
-                    })
+            run_state.set_page_audio(page_num, filename)
+            
+            await run_manager.emit_event(run_id, {
+                "status": run_state.status.value,
+                "stage": run_state.stage.value,
+                "ready_max_page": run_state.ready_max_page,
+                "ready_max_audio_page": run_state.ready_max_audio_page
+            })
         
-        # Run image and audio generation in parallel
-        await asyncio.gather(
-            generate_images(),
-            generate_audio()
-        )
+        # Create all tasks for parallel execution
+        image_tasks = []
+        audio_tasks = []
+        
+        # Cover (page 0)
+        image_tasks.append(generate_single_image(0, cover_prompt, base_seed))
+        audio_tasks.append(generate_single_audio(0, cover_title))
+        
+        # Panels 1-4 (same seed for consistency)
+        for i, (prompt, summary) in enumerate(zip(panel_descriptions, [p.get("summary", "") for p in story_panels[:4]]), start=1):
+            image_tasks.append(generate_single_image(i, prompt, base_seed))
+            audio_tasks.append(generate_single_audio(i, summary))
+        
+        # Run ALL tasks in parallel (images and audio mixed)
+        await asyncio.gather(*image_tasks, *audio_tasks)
         
         # Update final stage
         run_state.stage = Stage.TTS

@@ -16,7 +16,7 @@ def _resolve_llama_cli() -> Path:
 
 
 def _resolve_model() -> Path:
-    preferred = BASE_DIR / "llm_model" / "Qwen3-14B-Q8_0.gguf"
+    preferred = BASE_DIR / "llm_model" / "Qwen3-14B-Q4_K_M.gguf"
     if preferred.is_file():
         return preferred
 
@@ -24,19 +24,19 @@ def _resolve_model() -> Path:
     candidates = sorted(model_dir.glob("*.gguf"))
     if candidates:
         return candidates[0]
+# LLM Configuration
+USE_SERVER_MODE = False  # Set to True to use server mode (requires more VRAM)
+LLAMA_SERVER_URL = "http://127.0.0.1:8080"
 
-    return preferred
-
-
-# Paths to llama.cpp binary, model, and grammar.
+# Paths to llama.cpp binary, model, and grammar (for CLI mode)
 LLAMA_CLI = _resolve_llama_cli()
-MODEL_GGUF = _resolve_model()
-GRAMMAR = BASE_DIR / "story_spec.gbnf"
+GGUF_MODEL = BASE_DIR / "llm_model" / "Qwen3-14B-Q4_K_M.gguf"
+GRAMMAR_FILE = BASE_DIR / "story_spec.gbnf"
 
 # Generation settings passed through to llama.cpp.
 USE_GRAMMAR = True
 GEN_ARGS = {
-    "temp": 0.2,
+    "temp": 0.3,
     "top_p": 0.9,
     "repeat_penalty": 1.1,
     "n_predict": 500,
