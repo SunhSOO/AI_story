@@ -83,7 +83,10 @@ class RunManager:
     
     def create_run(self, era: str, place: str, characters: str, topic: str, tts_enabled: bool = True) -> str:
         """Create a new run and return its ID"""
-        run_id = uuid4().hex
+        # Generate timestamp-based ID: YYYYMMDD_HHMMSS_short_uuid
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        short_id = uuid4().hex[:6]  # 6 characters for uniqueness
+        run_id = f"{timestamp}_{short_id}"
         run_state = RunState(run_id, era, place, characters, topic, tts_enabled)
         self.runs[run_id] = run_state
         

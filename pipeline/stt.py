@@ -53,7 +53,7 @@ class STTEngine:
         result = self.model.transcribe(
             audio,
             language=language,
-            fp16=False  # CPU compatibility
+            fp16=True  # GPU acceleration
         )
         
         text = result["text"].strip()
@@ -157,7 +157,7 @@ async def process_field_stt(
         result = engine.model.transcribe(
             audio_array,
             language=language.split("-")[0],
-            fp16=False
+            fp16=True  # GPU acceleration
         )
         
         stt_text = result["text"].strip()

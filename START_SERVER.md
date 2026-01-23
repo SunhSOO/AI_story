@@ -19,12 +19,11 @@ uvicorn server:app --host 127.0.0.1 --port 8000 --reload
 - http://127.0.0.1:8000 에서 실행됨
 - **창을 닫지 마세요!**
 
-### 3. ngrok 터널 실행 (터미널 3)
+### 3. loacaltunner 터널 실행 (터미널 3)
 ```powershell
-ngrok http 8000
+npx localtunnel --port 8000 --subdomain mystorybook
 ```
-- 외부 접속 URL이 표시됩니다
-- 예: `https://abc-123-xyz.ngrok-free.app`
+
 
 ## 📱 휴대폰에서 접속
 

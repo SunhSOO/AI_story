@@ -103,6 +103,23 @@ class ComfyUIClient:
         response = requests.get(f"{self.base_url}/view", params=params)
         response.raise_for_status()
         return response.content
+    
+    def free_memory(self):
+        """Free GPU memory by unloading models
+        
+        Call this after image generation to free VRAM for other tasks (like LLM)
+        """
+        try:
+            # Try ComfyUI's free endpoint
+            response = requests.post(
+                f"{self.base_url}/free",
+                json={"unload_models": True, "free_memory": True},
+                timeout=5
+            )
+            return response.status_code == 200
+        except Exception:
+            # Best effort - don't fail if endpoint doesn't exist
+            return False
 
 
 def load_workflow_template(template_path: Path) -> dict:
@@ -161,8 +178,12 @@ def modify_workflow_for_panel(
                 # Positive prompt - prepend style
                 full_prompt = prepend_style + positive_prompt
                 api_node["inputs"]["text"] = full_prompt
+            elif title == "PROMPT_NEG" or node_id == "6":
+                # Negative prompt - use strong text prevention
+                strong_negative = "text, letters, words, writing, typography, watermark, logo, signature, title, caption, subtitle, label, speech bubble, dialogue, textbox, font, alphabet, number, digit, character, handwriting, calligraphy, inscription, annotation, footnote, headline, photorealistic, 3D, crowd, blurry"
+                api_node["inputs"]["text"] = strong_negative
             else:
-                # Negative prompt or other
+                # Other CLIPTextEncode nodes
                 api_node["inputs"]["text"] = widgets[0] if widgets else ""
             
             # CLIP input connection

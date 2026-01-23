@@ -185,21 +185,40 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
                 "ready_max_audio_page": run_state.ready_max_audio_page
             })
         
-        # Create all tasks for parallel execution
-        image_tasks = []
-        audio_tasks = []
+        # Start audio generation in background immediately
+        # Create tasks from coroutines and start them
+        audio_coroutines = []
         
+        # Cover (page 0) audio
+        audio_coroutines.append(generate_single_audio(0, cover_title))
+        
+        # Panels 1-4 audio
+        for i, summary in enumerate([p.get("summary", "") for p in story_panels[:4]], start=1):
+            audio_coroutines.append(generate_single_audio(i, summary))
+        
+        # Start all audio tasks in background
+        if audio_coroutines:
+            audio_gathering_task = asyncio.gather(*audio_coroutines)
+        else:
+            audio_gathering_task = None
+        
+        # Run image tasks SEQUENTIALLY (Cover -> Panel 1-4)
         # Cover (page 0)
-        image_tasks.append(generate_single_image(0, cover_prompt, base_seed))
-        audio_tasks.append(generate_single_audio(0, cover_title))
+        await generate_single_image(0, cover_prompt, base_seed)
         
-        # Panels 1-4 (same seed for consistency)
-        for i, (prompt, summary) in enumerate(zip(panel_descriptions, [p.get("summary", "") for p in story_panels[:4]]), start=1):
-            image_tasks.append(generate_single_image(i, prompt, base_seed))
-            audio_tasks.append(generate_single_audio(i, summary))
-        
-        # Run ALL tasks in parallel (images and audio mixed)
-        await asyncio.gather(*image_tasks, *audio_tasks)
+        # Panels 1-4
+        for i, prompt in enumerate(panel_descriptions, start=1):
+            await generate_single_image(i, prompt, base_seed)
+            
+        # Free GPU memory after all images are generated
+        try:
+            await loop.run_in_executor(None, lambda: ComfyUIClient().free_memory())
+        except Exception as e:
+            print(f"Failed to free GPU memory: {e}")
+
+        # Wait for audio to finish if it hasn't already
+        if audio_gathering_task is not None:
+            await audio_gathering_task
         
         # Update final stage
         run_state.stage = Stage.TTS
@@ -223,6 +242,9 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         # Mark as FAILED
         run_state.status = Status.FAILED
         run_state.error = str(e)
+        import traceback
+        traceback.print_exc()
+        print(f"Pipeline Error: {e}")
         await run_manager.emit_event(run_id, {
             "status": run_state.status.value,
             "stage": run_state.stage.value,
