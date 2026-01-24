@@ -1,6 +1,7 @@
 """
 Speech-to-Text implementation using Whisper
 """
+import os
 import tempfile
 from pathlib import Path
 from typing import Tuple
@@ -95,16 +96,18 @@ class FieldParser:
         return text.strip()
 
 
-# Global STT engine instance (lazy loaded)
-_stt_engine: STTEngine | None = None
-
-
-def get_stt_engine() -> STTEngine:
-    """Get or create STT engine singleton"""
-    global _stt_engine
-    if _stt_engine is None:
-        _stt_engine = STTEngine(model_name="medium")
-    return _stt_engine
+def clear_stt_memory():
+    """Clear STT model from GPU memory"""
+    import gc
+    import torch
+    
+    # Clear CUDA cache
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+    
+    # Force garbage collection
+    gc.collect()
 
 
 async def process_field_stt(
@@ -123,38 +126,63 @@ async def process_field_stt(
         Tuple of (stt_text, parsed_value, confidence)
     """
     # Save audio to temp file first
-    with tempfile.NamedTemporaryFile(suffix=".tmp", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         tmp.write(audio_data)
         tmp_path = Path(tmp.name)
     
-    wav_path = None
     try:
-        # Convert to WAV using pydub (supports webm, mp4, etc.)
-        try:
-            from pydub import AudioSegment
-            
-            # Load audio (pydub auto-detects format)
-            audio = AudioSegment.from_file(str(tmp_path))
-            
-            # Convert to mono and set to 16kHz (Whisper requirements)
-            audio = audio.set_channels(1).set_frame_rate(16000)
-            
-            # Export as WAV
-            wav_path = tmp_path.with_suffix('.wav')
-            audio.export(str(wav_path), format='wav')
-            
-        except Exception as e:
-            raise RuntimeError(f"Failed to convert audio format: {e}")
+        # Try to use soundfile + ffmpeg directly for conversion
+        # If webm, we need to convert it first
+        import subprocess
+        import soundfile as sf
         
-        # Transcribe using Whisper
-        engine = get_stt_engine()
+        # Create a temporary WAV file
+        wav_path = tmp_path.with_suffix('.wav')
+        
+        # Use ffmpeg directly to convert to WAV
+        ffmpeg_path = r"C:\ffmpeg\bin\ffmpeg.exe"
+        if os.path.exists(ffmpeg_path):
+            # Use ffmpeg to convert any audio format to WAV
+            cmd = [
+                ffmpeg_path,
+                '-i', str(tmp_path),
+                '-ar', '16000',  # 16kHz sample rate
+                '-ac', '1',       # mono
+                '-y',             # overwrite output
+                str(wav_path)
+            ]
+            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            if result.returncode != 0:
+                raise RuntimeError(f"ffmpeg conversion failed: {result.stderr.decode()}")
+        else:
+            # Fallback: try to read directly with soundfile
+            try:
+                audio_array, sample_rate = sf.read(str(tmp_path), dtype='float32')
+                # Convert to mono if stereo
+                if len(audio_array.shape) > 1:
+                    audio_array = audio_array.mean(axis=1)
+                # Resample to 16kHz if needed
+                if sample_rate != 16000:
+                    from scipy import signal
+                    audio_array = signal.resample(audio_array, int(len(audio_array) * 16000 / sample_rate))
+                # Write to WAV
+                sf.write(str(wav_path), audio_array, 16000)
+            except Exception as e:
+                raise RuntimeError(f"Failed to convert audio (no ffmpeg): {e}")
+        
+        # Load Whisper model (on-demand, will be freed after use)
+        import torch
+        import gc
+        import soundfile as sf
         
         # Load WAV with soundfile
-        import soundfile as sf
         audio_array, sample_rate = sf.read(str(wav_path), dtype='float32')
         
+        # Load model just before use
+        model = whisper.load_model("medium")
+        
         # Transcribe
-        result = engine.model.transcribe(
+        result = model.transcribe(
             audio_array,
             language=language.split("-")[0],
             fp16=True  # GPU acceleration
@@ -175,6 +203,19 @@ async def process_field_stt(
         # Parse based on field type
         parser_method = getattr(FieldParser, f"parse_{field_type}", FieldParser.parse_topic)
         parsed_value = parser_method(stt_text)
+        
+        # !!! CRITICAL: Free GPU memory immediately after use !!!
+        del model
+        del result
+        del audio_array
+        
+        # Clear GPU cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        
+        # Force garbage collection
+        gc.collect()
         
         return stt_text, parsed_value, confidence
         
