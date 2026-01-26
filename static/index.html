@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 동화책 생성기</title>
+    <title>AI 동화책 생성 테스트 서버</title>
     <style>
         * {
             margin: 0;
@@ -26,6 +26,7 @@
             border-radius: 20px;
             padding: 30px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            min-height: 500px;
         }
 
         h1 {
@@ -35,19 +36,48 @@
             font-size: 28px;
         }
 
-        .input-group {
+        /* Screen System */
+        .screen {
+            display: none;
+            animation: fadeIn 0.4s ease-in;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Progress Indicator */
+        .progress-indicator {
+            text-align: center;
             margin-bottom: 20px;
+            color: #667eea;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Input Screens */
+        .input-group {
+            margin-bottom: 30px;
         }
 
         label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             color: #333;
             font-weight: 600;
-        }
-
-        .input-wrapper {
-            position: relative;
+            font-size: 18px;
         }
 
         .input-with-mic {
@@ -56,15 +86,30 @@
             align-items: center;
         }
 
+        input {
+            flex: 1;
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         .mic-button {
             flex-shrink: 0;
-            width: 45px;
-            height: 45px;
+            width: 50px;
+            height: 50px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
             border-radius: 50%;
             color: white;
-            font-size: 20px;
+            font-size: 22px;
             cursor: pointer;
             transition: all 0.3s;
         }
@@ -93,28 +138,18 @@
         .stt-status {
             font-size: 12px;
             color: #667eea;
-            margin-top: 5px;
+            margin-top: 8px;
         }
 
-        input,
-        select {
+        /* Buttons */
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        button.primary-btn {
             flex: 1;
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        input:focus,
-        select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        button {
-            width: 100%;
             padding: 15px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -126,77 +161,108 @@
             transition: transform 0.2s;
         }
 
-        button:hover {
+        button.primary-btn:hover {
             transform: translateY(-2px);
         }
 
-        button:active {
+        button.primary-btn:active {
             transform: translateY(0);
         }
 
-        button:disabled {
-            opacity: 0.6;
+        button.primary-btn:disabled {
+            opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
 
-        .status {
-            margin-top: 30px;
-            padding: 15px;
-            background: #f5f5f5;
-            border-radius: 10px;
-            display: none;
-        }
-
-        .status.show {
-            display: block;
-        }
-
-        .status h3 {
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
+        button.secondary-btn {
+            padding: 15px 30px;
             background: #e0e0e0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 10px 0;
+            color: #333;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
         }
 
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
-            width: 0%;
-            transition: width 0.5s;
+        button.secondary-btn:hover {
+            background: #d0d0d0;
         }
 
-        .results {
-            margin-top: 20px;
+        /* Story Page Display */
+        .story-page {
+            text-align: center;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #667eea;
+        }
+
+        .loading-spinner {
+            border: 4px solid #e0e0e0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .page-content {
             display: none;
         }
 
-        .results.show {
+        .page-content.ready {
             display: block;
         }
 
-        .result-item {
-            margin: 10px 0;
-            padding: 10px;
-            background: white;
-            border-radius: 8px;
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
         }
 
-        .result-item img {
+        .page-summary {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #666;
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+
+        .page-image {
             width: 100%;
-            border-radius: 8px;
-            margin-top: 10px;
+            max-width: 500px;
+            border-radius: 15px;
+            margin: 20px auto;
+            display: block;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         }
 
         .audio-player {
             width: 100%;
-            margin-top: 10px;
+            margin: 20px 0;
+        }
+
+        .page-number {
+            color: #667eea;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -205,117 +271,283 @@
     <div class="container">
         <h1>🎨 AI 동화책 생성기</h1>
 
-        <div class="input-group">
-            <label for="era">시대 🎙️</label>
-            <div class="input-with-mic">
-                <input type="text" id="era" placeholder="예: 현대, 옛날">
-                <button class="mic-button" onclick="startSTT('era')" title="음성 입력">🎤</button>
+        <!-- Screen 1: Era Input -->
+        <div class="screen active" id="screen-era">
+            <div class="progress-indicator">1 / 4</div>
+            <div class="input-group">
+                <label for="era">시대를 말씀해주세요 🎙️</label>
+                <div class="input-with-mic">
+                    <input type="text" id="era" placeholder="예: 현대, 옛날, 미래">
+                    <button class="mic-button" onclick="startSTT('era')" title="음성 입력">🎤</button>
+                </div>
+                <div id="era-status" class="stt-status"></div>
             </div>
-            <div id="era-status" class="stt-status"></div>
-        </div>
-
-        <div class="input-group">
-            <label for="place">장소 🎙️</label>
-            <div class="input-with-mic">
-                <input type="text" id="place" placeholder="예: 숲, 바다">
-                <button class="mic-button" onclick="startSTT('place')" title="음성 입력">🎤</button>
+            <div class="button-group">
+                <button class="primary-btn" onclick="nextScreen()">다음</button>
             </div>
-            <div id="place-status" class="stt-status"></div>
         </div>
 
-        <div class="input-group">
-            <label for="characters">등장인물 🎙️</label>
-            <div class="input-with-mic">
-                <input type="text" id="characters" placeholder="예: 토끼, 여우">
-                <button class="mic-button" onclick="startSTT('characters')" title="음성 입력">🎤</button>
+        <!-- Screen 2: Place Input -->
+        <div class="screen" id="screen-place">
+            <div class="progress-indicator">2 / 4</div>
+            <div class="input-group">
+                <label for="place">배경을 말씀해주세요 🎙️</label>
+                <div class="input-with-mic">
+                    <input type="text" id="place" placeholder="예: 숲, 바다, 우주">
+                    <button class="mic-button" onclick="startSTT('place')" title="음성 입력">🎤</button>
+                </div>
+                <div id="place-status" class="stt-status"></div>
             </div>
-            <div id="characters-status" class="stt-status"></div>
-        </div>
-
-        <div class="input-group">
-            <label for="topic">주제 🎙️</label>
-            <div class="input-with-mic">
-                <input type="text" id="topic" placeholder="예: 우정, 용기">
-                <button class="mic-button" onclick="startSTT('topic')" title="음성 입력">🎤</button>
+            <div class="button-group">
+                <button class="secondary-btn" onclick="prevScreen()">이전</button>
+                <button class="primary-btn" onclick="nextScreen()">다음</button>
             </div>
-            <div id="topic-status" class="stt-status"></div>
         </div>
 
-        <div class="input-group">
-            <label for="tts">음성 생성</label>
-            <select id="tts">
-                <option value="true">생성</option>
-                <option value="false">생성 안함</option>
-            </select>
-        </div>
-
-        <button id="generateBtn" onclick="generateStory()">동화 생성하기</button>
-
-        <div class="status" id="status">
-            <h3>생성 중...</h3>
-            <div id="statusText">준비 중</div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressBar"></div>
+        <!-- Screen 3: Characters Input -->
+        <div class="screen" id="screen-characters">
+            <div class="progress-indicator">3 / 4</div>
+            <div class="input-group">
+                <label for="characters">등장인물을 말씀해주세요 🎙️</label>
+                <div class="input-with-mic">
+                    <input type="text" id="characters" placeholder="예: 토끼, 여우, 곰">
+                    <button class="mic-button" onclick="startSTT('characters')" title="음성 입력">🎤</button>
+                </div>
+                <div id="characters-status" class="stt-status"></div>
             </div>
-            <div id="stageInfo"></div>
+            <div class="button-group">
+                <button class="secondary-btn" onclick="prevScreen()">이전</button>
+                <button class="primary-btn" onclick="nextScreen()">다음</button>
+            </div>
         </div>
 
-        <div class="results" id="results">
-            <h3>생성 완료!</h3>
-            <div id="resultContent"></div>
+        <!-- Screen 4: Topic Input -->
+        <div class="screen" id="screen-topic">
+            <div class="progress-indicator">4 / 4</div>
+            <div class="input-group">
+                <label for="topic">주제를 말씀해주세요 🎙️</label>
+                <div class="input-with-mic">
+                    <input type="text" id="topic" placeholder="예: 우정, 용기, 사랑">
+                    <button class="mic-button" onclick="startSTT('topic')" title="음성 입력">🎤</button>
+                </div>
+                <div id="topic-status" class="stt-status"></div>
+            </div>
+            <div class="button-group">
+                <button class="secondary-btn" onclick="prevScreen()">이전</button>
+                <button class="primary-btn" onclick="startGeneration()">동화 생성 시작!</button>
+            </div>
+        </div>
+
+        <!-- Story Pages (0-4) -->
+        <div class="screen" id="screen-story-0">
+            <div class="page-number">표지</div>
+            <div class="story-page">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>표지를 그리는 중...</p>
+                </div>
+                <div class="page-content" id="page-content-0">
+                    <h2 class="page-title" id="title-0"></h2>
+                    <img class="page-image" id="image-0" alt="표지">
+                    <audio class="audio-player" id="audio-0" controls></audio>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="primary-btn" id="next-btn-0" onclick="nextStoryPage()" disabled>다음 페이지</button>
+            </div>
+        </div>
+
+        <div class="screen" id="screen-story-1">
+            <div class="page-number">1 / 4</div>
+            <div class="story-page">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>첫 번째 장면을 그리는 중...</p>
+                </div>
+                <div class="page-content" id="page-content-1">
+                    <p class="page-summary" id="summary-1"></p>
+                    <img class="page-image" id="image-1" alt="1페이지">
+                    <audio class="audio-player" id="audio-1" controls></audio>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="secondary-btn" onclick="prevStoryPage()">이전 페이지</button>
+                <button class="primary-btn" id="next-btn-1" onclick="nextStoryPage()" disabled>다음 페이지</button>
+            </div>
+        </div>
+
+        <div class="screen" id="screen-story-2">
+            <div class="page-number">2 / 4</div>
+            <div class="story-page">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>두 번째 장면을 그리는 중...</p>
+                </div>
+                <div class="page-content" id="page-content-2">
+                    <p class="page-summary" id="summary-2"></p>
+                    <img class="page-image" id="image-2" alt="2페이지">
+                    <audio class="audio-player" id="audio-2" controls></audio>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="secondary-btn" onclick="prevStoryPage()">이전 페이지</button>
+                <button class="primary-btn" id="next-btn-2" onclick="nextStoryPage()" disabled>다음 페이지</button>
+            </div>
+        </div>
+
+        <div class="screen" id="screen-story-3">
+            <div class="page-number">3 / 4</div>
+            <div class="story-page">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>세 번째 장면을 그리는 중...</p>
+                </div>
+                <div class="page-content" id="page-content-3">
+                    <p class="page-summary" id="summary-3"></p>
+                    <img class="page-image" id="image-3" alt="3페이지">
+                    <audio class="audio-player" id="audio-3" controls></audio>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="secondary-btn" onclick="prevStoryPage()">이전 페이지</button>
+                <button class="primary-btn" id="next-btn-3" onclick="nextStoryPage()" disabled>다음 페이지</button>
+            </div>
+        </div>
+
+        <div class="screen" id="screen-story-4">
+            <div class="page-number">4 / 4 (마지막)</div>
+            <div class="story-page">
+                <div class="loading-state">
+                    <div class="loading-spinner"></div>
+                    <p>마지막 장면을 그리는 중...</p>
+                </div>
+                <div class="page-content" id="page-content-4">
+                    <p class="page-summary" id="summary-4"></p>
+                    <img class="page-image" id="image-4" alt="4페이지">
+                    <audio class="audio-player" id="audio-4" controls></audio>
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="secondary-btn" onclick="prevStoryPage()">이전 페이지</button>
+                <button class="primary-btn" onclick="resetToStart()">끝내기</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // API 서버 URL (휴대폰에서 접속할 때는 PC의 IP 주소로 변경)
         const API_URL = window.location.origin;
 
+        // State management
+        let currentScreenIndex = 0;
+        const inputScreens = ['screen-era', 'screen-place', 'screen-characters', 'screen-topic'];
+        const storyScreens = ['screen-story-0', 'screen-story-1', 'screen-story-2', 'screen-story-3', 'screen-story-4'];
+        let currentStoryPage = 0;
         let currentRunId = null;
         let eventSource = null;
         let mediaRecorder = null;
         let audioChunks = [];
+        let ttsEnabled = true;
 
-        // STT 기능
+        // Page ready tracking
+        let pageReadyStatus = [false, false, false, false, false];
+
+        // Screen navigation
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function nextScreen() {
+            const currentField = ['era', 'place', 'characters', 'topic'][currentScreenIndex];
+            const value = document.getElementById(currentField).value.trim();
+
+            if (!value) {
+                alert('내용을 입력해주세요!');
+                return;
+            }
+
+            if (currentScreenIndex < inputScreens.length - 1) {
+                currentScreenIndex++;
+                showScreen(inputScreens[currentScreenIndex]);
+            }
+        }
+
+        function prevScreen() {
+            if (currentScreenIndex > 0) {
+                currentScreenIndex--;
+                showScreen(inputScreens[currentScreenIndex]);
+            }
+        }
+
+        function nextStoryPage() {
+            if (currentStoryPage < 4) {
+                currentStoryPage++;
+                showScreen(storyScreens[currentStoryPage]);
+            }
+        }
+
+        function prevStoryPage() {
+            if (currentStoryPage > 0) {
+                currentStoryPage--;
+                showScreen(storyScreens[currentStoryPage]);
+            }
+        }
+
+        function resetToStart() {
+            // Reset all state
+            currentScreenIndex = 0;
+            currentStoryPage = 0;
+            currentRunId = null;
+            pageReadyStatus = [false, false, false, false, false];
+
+            // Clear inputs
+            ['era', 'place', 'characters', 'topic'].forEach(field => {
+                document.getElementById(field).value = '';
+            });
+
+            // Reset page content visibility
+            for (let i = 0; i < 5; i++) {
+                document.getElementById(`page-content-${i}`).classList.remove('ready');
+                document.getElementById(`next-btn-${i}`)?.setAttribute('disabled', 'true');
+            }
+
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            showScreen('screen-era');
+        }
+
+        // STT functionality
         async function startSTT(fieldType) {
             const button = event.target;
             const statusDiv = document.getElementById(`${fieldType}-status`);
 
             try {
-                // 브라우저 지원 확인
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                     throw new Error('이 브라우저는 음성 녹음을 지원하지 않습니다');
                 }
 
-                // 마이크 권한 요청
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: {
                         echoCancellation: true,
                         noiseSuppression: true,
-                        sampleRate: 16000  // Whisper 최적화
+                        sampleRate: 16000
                     }
                 });
 
-                // 녹음 시작
                 audioChunks = [];
-
-                // 모바일 호환성을 위한 MIME 타입 확인
                 let mimeType = 'audio/webm';
                 if (!MediaRecorder.isTypeSupported('audio/webm')) {
-                    if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                        mimeType = 'audio/mp4';
-                    } else if (MediaRecorder.isTypeSupported('audio/mpeg')) {
-                        mimeType = 'audio/mpeg';
-                    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-                        mimeType = 'audio/wav';
-                    }
+                    if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+                    else if (MediaRecorder.isTypeSupported('audio/mpeg')) mimeType = 'audio/mpeg';
+                    else if (MediaRecorder.isTypeSupported('audio/wav')) mimeType = 'audio/wav';
                 }
 
                 mediaRecorder = new MediaRecorder(stream, { mimeType });
 
                 mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
+                    if (event.data.size > 0) audioChunks.push(event.data);
                 };
 
                 mediaRecorder.onstop = async () => {
@@ -326,10 +558,8 @@
 
                 button.classList.add('recording');
                 statusDiv.textContent = '🎤 녹음 중... (클릭하면 종료)';
-
                 mediaRecorder.start();
 
-                // 버튼 다시 클릭하면 중지
                 button.onclick = () => {
                     if (mediaRecorder && mediaRecorder.state === 'recording') {
                         mediaRecorder.stop();
@@ -341,13 +571,7 @@
 
             } catch (error) {
                 console.error('STT 오류:', error);
-                let errorMsg = '마이크 권한이 필요합니다';
-                if (error.name === 'NotAllowedError') {
-                    errorMsg = '마이크 권한을 허용해주세요';
-                } else if (error.name === 'NotFoundError') {
-                    errorMsg = '마이크를 찾을 수 없습니다';
-                }
-                alert(errorMsg + ': ' + error.message);
+                alert('마이크 권한이 필요합니다: ' + error.message);
                 statusDiv.textContent = '';
             }
         }
@@ -356,7 +580,6 @@
             const statusDiv = document.getElementById(`${fieldType}-status`);
 
             try {
-                // 파일 확장자 결정
                 let extension = 'webm';
                 if (mimeType.includes('mp4')) extension = 'mp4';
                 else if (mimeType.includes('mpeg')) extension = 'mp3';
@@ -374,14 +597,12 @@
                 });
 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`STT 요청 실패: ${response.status} - ${errorText}`);
+                    throw new Error(`STT 요청 실패: ${response.status}`);
                 }
 
                 const data = await response.json();
-
-                // 입력 필드에 결과 입력
                 const resultText = data.parsed_value || data.stt_text;
+
                 if (resultText) {
                     document.getElementById(fieldType).value = resultText;
                     statusDiv.textContent = `✓ 인식됨 (${Math.round(data.confidence * 100)}%)`;
@@ -389,9 +610,7 @@
                     statusDiv.textContent = '✗ 음성을 인식하지 못했습니다';
                 }
 
-                setTimeout(() => {
-                    statusDiv.textContent = '';
-                }, 3000);
+                setTimeout(() => statusDiv.textContent = '', 3000);
 
             } catch (error) {
                 console.error('sendSTT 오류:', error);
@@ -400,31 +619,22 @@
             }
         }
 
-        async function generateStory() {
-            const era = document.getElementById('era').value;
-            const place = document.getElementById('place').value;
-            const characters = document.getElementById('characters').value;
-            const topic = document.getElementById('topic').value;
-            const ttsEnabled = document.getElementById('tts').value === 'true';
+        // Story generation
+        async function startGeneration() {
+            const era = document.getElementById('era').value.trim();
+            const place = document.getElementById('place').value.trim();
+            const characters = document.getElementById('characters').value.trim();
+            const topic = document.getElementById('topic').value.trim();
 
             if (!era || !place || !characters || !topic) {
                 alert('모든 항목을 입력해주세요!');
                 return;
             }
 
-            // UI 초기화
-            document.getElementById('generateBtn').disabled = true;
-            document.getElementById('status').classList.add('show');
-            document.getElementById('results').classList.remove('show');
-            document.getElementById('progressBar').style.width = '0%';
-
             try {
-                // 1. 동화 생성 시작
                 const response = await fetch(`${API_URL}/api/runs`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         era_ko: era,
                         place_ko: place,
@@ -434,109 +644,89 @@
                     })
                 });
 
-                if (!response.ok) {
-                    throw new Error('생성 요청 실패');
-                }
+                if (!response.ok) throw new Error('생성 요청 실패');
 
                 const data = await response.json();
                 currentRunId = data.run_id;
 
-                // 2. SSE로 진행상황 모니터링
+                // Show first story page (cover)
+                showScreen('screen-story-0');
+                currentStoryPage = 0;
+
+                // Start monitoring progress
                 monitorProgress(currentRunId);
 
             } catch (error) {
                 alert('오류 발생: ' + error.message);
-                document.getElementById('generateBtn').disabled = false;
-                document.getElementById('status').classList.remove('show');
             }
         }
 
         function monitorProgress(runId) {
-            // SSE 연결
             eventSource = new EventSource(`${API_URL}/api/runs/${runId}/events`);
 
-            eventSource.addEventListener('update', (event) => {
+            eventSource.addEventListener('update', async (event) => {
                 const data = JSON.parse(event.data);
-                updateProgress(data);
+                await updatePageDisplay(data);
 
-                // 완료되면 결과 표시
-                if (data.status === 'DONE') {
+                if (data.status === 'DONE' || data.status === 'FAILED') {
                     eventSource.close();
-                    showResults(runId);
-                } else if (data.status === 'FAILED') {
-                    eventSource.close();
-                    alert('생성 실패: ' + (data.error || '알 수 없는 오류'));
-                    document.getElementById('generateBtn').disabled = false;
-                    document.getElementById('status').classList.remove('show');
+                    if (data.status === 'FAILED') {
+                        alert('생성 실패: ' + (data.error || '알 수 없는 오류'));
+                        resetToStart();
+                    }
                 }
             });
-
-            eventSource.onerror = (error) => {
-                console.error('SSE error:', error);
-            };
         }
 
-        function updateProgress(data) {
-            const statusText = document.getElementById('statusText');
-            const stageInfo = document.getElementById('stageInfo');
-            const progressBar = document.getElementById('progressBar');
+        async function updatePageDisplay(data) {
+            // Check each page if it's ready (image + audio)
+            for (let page = 0; page <= data.ready_max_page && page < 5; page++) {
+                const hasAudio = (data.ready_max_audio_page >= page) || !ttsEnabled;
 
-            // 상태 표시
-            statusText.textContent = `상태: ${data.status} / 단계: ${data.stage}`;
+                if (hasAudio && !pageReadyStatus[page]) {
+                    pageReadyStatus[page] = true;
+                    await displayPage(page);
+                }
+            }
 
-            // 진행률 계산
-            let progress = 0;
-            if (data.stage === 'LLM') progress = 20;
-            else if (data.stage === 'COVER') progress = 30;
-            else if (data.stage === 'PANEL_1') progress = 45;
-            else if (data.stage === 'PANEL_2') progress = 60;
-            else if (data.stage === 'PANEL_3') progress = 75;
-            else if (data.stage === 'PANEL_4') progress = 85;
-            else if (data.stage === 'TTS') progress = 95;
-
-            progressBar.style.width = progress + '%';
-
-            // 상세 정보
-            stageInfo.innerHTML = `
-                이미지: ${data.ready_max_page + 1}/5 완료<br>
-                오디오: ${data.ready_max_audio_page + 1}/5 완료
-            `;
+            // Check if we can enable next button for all pages
+            for (let i = 0; i < 4; i++) {
+                if (pageReadyStatus[i + 1]) {
+                    const btn = document.getElementById(`next-btn-${i}`);
+                    if (btn) btn.disabled = false;
+                }
+            }
         }
 
-        async function showResults(runId) {
-            document.getElementById('generateBtn').disabled = false;
-            document.getElementById('status').classList.remove('show');
-            document.getElementById('results').classList.add('show');
-            document.getElementById('progressBar').style.width = '100%';
+        async function displayPage(pageNum) {
+            try {
+                const response = await fetch(`${API_URL}/api/runs/${currentRunId}`);
+                const data = await response.json();
+                const page = data.pages[pageNum];
 
-            // 상태 조회
-            const response = await fetch(`${API_URL}/api/runs/${runId}`);
-            const data = await response.json();
+                // Hide loading, show content
+                const contentDiv = document.getElementById(`page-content-${pageNum}`);
+                contentDiv.classList.add('ready');
 
-            // 결과 표시
-            const resultContent = document.getElementById('resultContent');
-            resultContent.innerHTML = '';
-
-            for (const page of data.pages) {
-                const div = document.createElement('div');
-                div.className = 'result-item';
-
-                let html = `<h4>Page ${page.page}</h4>`;
-                if (page.title) html += `<p><strong>${page.title}</strong></p>`;
-                if (page.summary) html += `<p>${page.summary}</p>`;
+                // Set content
+                if (pageNum === 0) {
+                    document.getElementById(`title-${pageNum}`).textContent = page.title || '';
+                } else {
+                    document.getElementById(`summary-${pageNum}`).textContent = page.summary || '';
+                }
 
                 if (page.image_url) {
-                    html += `<img src="${API_URL}${page.image_url}" alt="Page ${page.page}">`;
+                    document.getElementById(`image-${pageNum}`).src = `${API_URL}${page.image_url}`;
                 }
 
                 if (page.audio_url) {
-                    html += `<audio controls class="audio-player">
-                        <source src="${API_URL}${page.audio_url}" type="audio/wav">
-                    </audio>`;
+                    const audio = document.getElementById(`audio-${pageNum}`);
+                    audio.innerHTML = `<source src="${API_URL}${page.audio_url}" type="audio/wav">`;
+                    audio.load();
                 }
 
-                div.innerHTML = html;
-                resultContent.appendChild(div);
+            } catch (error) {
+                console.error('페이지 표시 오류:', error);
             }
         }
     </script>

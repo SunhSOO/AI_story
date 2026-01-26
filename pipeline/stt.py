@@ -11,7 +11,7 @@ import whisper
 class STTEngine:
     """STT engine using OpenAI Whisper"""
     
-    def __init__(self, model_name: str = "medium"):
+    def __init__(self, model_name: str = "small"):
         """Initialize Whisper model
         
         Args:
@@ -54,7 +54,7 @@ class STTEngine:
         result = self.model.transcribe(
             audio,
             language=language,
-            fp16=True  # GPU acceleration
+            fp16=False  # GPU acceleration disabled (CPU mode)
         )
         
         text = result["text"].strip()

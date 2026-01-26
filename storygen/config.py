@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import random
 # Base directory of the project.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -48,4 +48,4 @@ RAW_OUTPUT_PATH = BASE_DIR / "raw_output.txt"
 SPEC_OUTPUT_PATH = BASE_DIR / "story_output.json"
 
 # Default seed value used by the story generator.
-DEFAULT_BASE_SEED = 31007
+DEFAULT_BASE_SEED = random.randint(0, 99999)  

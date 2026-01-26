@@ -45,6 +45,25 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             "ready_max_audio_page": run_state.ready_max_audio_page
         })
         
+        # SYSTEM CLEANUP: Force clean state before starting
+        # 1. Kill any zombie LLM processes
+        import subprocess
+        import sys
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/IM", "llama-cli.exe"], 
+                         capture_output=True, check=False)
+        
+        # 2. Free any GPU memory from previous image generation
+        try:
+             # We need to import ComfyUIClient here as it's not imported yet
+            from pipeline.image_gen import ComfyUIClient
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, lambda: ComfyUIClient().free_memory())
+            print("System cleaned up: LLM processes killed, GPU memory freed.")
+        except Exception as e:
+            print(f"Warning: Cleanup failed: {e}")
+
+        
         # Stage 1: LLM - Generate story
         run_state.stage = Stage.LLM
         await run_manager.emit_event(run_id, {
@@ -121,7 +140,7 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         import random
         
         # Generate random seed for consistency
-        base_seed = random.randint(1000000, 9999999)
+        base_seed = random.randint(0, 9999999)
         
         # Prepare all image generation tasks
         async def generate_single_image(page_num: int, prompt: str, seed: int):

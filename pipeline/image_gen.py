@@ -194,7 +194,7 @@ def modify_workflow_for_panel(
             widgets = node.get("widgets_values", [])
             api_node["inputs"]["seed"] = seed
             api_node["inputs"]["control_after_generate"] = "fixed"
-            api_node["inputs"]["steps"] = widgets[2] if len(widgets) > 2 else 5
+            api_node["inputs"]["steps"] = 4  # Optimized for speed (default was 5)
             api_node["inputs"]["cfg"] = widgets[3] if len(widgets) > 3 else 1
             api_node["inputs"]["sampler_name"] = widgets[4] if len(widgets) > 4 else "dpmpp_sde_gpu"
             api_node["inputs"]["scheduler"] = widgets[5] if len(widgets) > 5 else "karras"
@@ -308,7 +308,7 @@ def generate_story_images(
     client = ComfyUIClient()
     
     # Generate cover with random seed
-    base_seed = random.randint(1000000, 9999999)
+    base_seed = random.randint(0, 9999999)
     
     filenames = {}
     

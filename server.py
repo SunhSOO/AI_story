@@ -41,6 +41,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global session lock - only allow one active user at a time
+active_session_lock = {"run_id": None, "in_progress": False}
+
 # Mount static files (for frontend)
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
@@ -138,6 +141,13 @@ async def create_run(request: CreateRunRequest, background_tasks: BackgroundTask
     
     Returns run_id immediately and starts background processing
     """
+    # Check if a session is already active
+    if active_session_lock["in_progress"]:
+        raise HTTPException(
+            status_code=503, 
+            detail="Server is busy. Only one story generation allowed at a time."
+        )
+
     # Create run
     run_id = run_manager.create_run(
         era=request.era_ko,
@@ -147,8 +157,23 @@ async def create_run(request: CreateRunRequest, background_tasks: BackgroundTask
         tts_enabled=request.tts_enabled
     )
     
+    # Lock the session
+    active_session_lock["in_progress"] = True
+    active_session_lock["run_id"] = run_id
+    
+    # Define wrapper to ensure lock is released
+    async def run_pipeline_wrapper(rid, mgr):
+        try:
+            await run_story_pipeline(rid, mgr)
+        except Exception as e:
+            print(f"Pipeline failed: {e}")
+        finally:
+            print(f"Releasing session lock for run {rid}")
+            active_session_lock["in_progress"] = False
+            active_session_lock["run_id"] = None
+
     # Start background pipeline
-    background_tasks.add_task(run_story_pipeline, run_id, run_manager)
+    background_tasks.add_task(run_pipeline_wrapper, run_id, run_manager)
     
     return CreateRunResponse(run_id=run_id)
 
