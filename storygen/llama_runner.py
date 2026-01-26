@@ -24,6 +24,8 @@ def _build_command(prompt_path: Path) -> list[str]:
         str(GEN_ARGS["repeat_penalty"]),
         "-n",
         str(GEN_ARGS["n_predict"]),
+        "-ngl", "99",
+        "-c", "2048",
     ]
 
     if USE_GRAMMAR:
