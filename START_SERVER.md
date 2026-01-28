@@ -5,6 +5,7 @@
 ### 1. ComfyUI 실행 (터미널 1)
 ```powershell
 cd c:\Users\user\Desktop\make_story\ComfyUI
+venv/Scripts/activate
 python main.py
 ```
 - http://127.0.0.1:8188 에서 실행됨
@@ -21,6 +22,8 @@ uvicorn server:app --host 127.0.0.1 --port 8000 --reload
 
 ### 3. loacaltunner 터널 실행 (터미널 3)
 ```powershell
+.\start_tunnel.ps1
+또는
 npx localtunnel --port 8000 --subdomain mystorybook
 ```
 
