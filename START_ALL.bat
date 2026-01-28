@@ -10,7 +10,7 @@ set "PROJECT_DIR=%~dp0"
 
 REM 1. ComfyUI 실행
 echo 1. ComfyUI 실행 중...
-start "ComfyUI" cmd /k "cd /d C:\ComfyUI_windows_portable && run_nvidia_gpu.bat"
+start "ComfyUI" cmd /k "cd /d %PROJECT_DIR%ComfyUI && venv\Scripts\activate.bat && python main.py"
 
 REM 2초 대기
 timeout /t 2 /nobreak >nul
