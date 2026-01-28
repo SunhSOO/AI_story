@@ -178,14 +178,14 @@ async def process_field_stt(
         # Load WAV with soundfile
         audio_array, sample_rate = sf.read(str(wav_path), dtype='float32')
         
-        # Load model just before use
-        model = whisper.load_model("medium")
+        # Load model just before use (CPU mode to avoid GPU conflicts)
+        model = whisper.load_model("medium", device="cpu")
         
-        # Transcribe
+        # Transcribe on CPU to prevent GPU memory conflicts with ComfyUI/LLM
         result = model.transcribe(
             audio_array,
             language=language.split("-")[0],
-            fp16=True  # GPU acceleration
+            fp16=False  # CPU mode - prevents GPU memory conflicts
         )
         
         stt_text = result["text"].strip()

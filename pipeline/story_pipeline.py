@@ -2,6 +2,7 @@
 Async story generation pipeline orchestrator
 """
 import asyncio
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -74,6 +75,8 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         })
         
         # Run LLM in executor to avoid blocking
+        print(f"\n[TIMING] Starting LLM generation for run {run_id}...")
+        llm_start = time.time()
         loop = asyncio.get_event_loop()
         story_obj = await loop.run_in_executor(
             None,
@@ -83,6 +86,8 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             run_state.characters,
             run_state.topic
         )
+        llm_end = time.time()
+        print(f"[TIMING] LLM generation completed in {llm_end - llm_start:.2f}s")
         
         # Extract story content from storygen JSON structure
         # story_obj = {"panels": [{"panel": 0, "subject": "...", "prompt": "..."}, ...]}
@@ -148,6 +153,10 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             filename = f"cover.png" if page_num == 0 else f"panel_{page_num}.png"
             output_path = run_dir / filename
             
+            page_name = "Cover" if page_num == 0 else f"Panel {page_num}"
+            print(f"[TIMING] Starting {page_name} image generation...")
+            img_start = time.time()
+            
             await loop.run_in_executor(
                 None,
                 generate_panel_image,
@@ -157,6 +166,9 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
                 workflow_path,
                 ComfyUIClient()
             )
+            
+            img_end = time.time()
+            print(f"[TIMING] {page_name} image completed in {img_end - img_start:.2f}s")
             
             run_state.set_page_image(page_num, filename)
             
@@ -184,6 +196,10 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             """Generate a single audio"""
             if not run_state.tts_enabled or not text.strip():
                 return
+            
+            page_name = "Cover" if page_num == 0 else f"Page {page_num}"
+            print(f"[TIMING] Starting {page_name} audio generation...")
+            audio_start = time.time()
                 
             filename = await loop.run_in_executor(
                 None,
@@ -194,6 +210,9 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
                 "M2",
                 "ko"
             )
+            
+            audio_end = time.time()
+            print(f"[TIMING] {page_name} audio completed in {audio_end - audio_start:.2f}s")
             
             run_state.set_page_audio(page_num, filename)
             

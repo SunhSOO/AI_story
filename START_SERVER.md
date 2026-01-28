@@ -23,8 +23,6 @@ uvicorn server:app --host 127.0.0.1 --port 8000 --reload
 ### 3. loacaltunner 터널 실행 (터미널 3)
 ```powershell
 .\start_tunnel.ps1
-또는
-npx localtunnel --port 8000 --subdomain mystorybook
 ```
 
 
@@ -51,8 +49,7 @@ npx localtunnel --port 8000 --subdomain mystorybook
 ## ⚠️ 주의사항
 
 - 3개 터미널 모두 실행 상태 유지 필요
-- ngrok URL은 무료 플랜에서 세션마다 변경됨
-- 첫 접속 시 ngrok 경고 화면 나타날 수 있음 (Visit Site 클릭)
+
 
 ## 🛑 종료
 
