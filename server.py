@@ -157,6 +157,19 @@ async def create_run(request: CreateRunRequest, background_tasks: BackgroundTask
         tts_enabled=request.tts_enabled
     )
     
+    # Clean GPU memory BEFORE starting generation (ensures clean state)
+    print(f"\n[GPU CLEANUP] Cleaning GPU memory before starting run {run_id}...")
+    try:
+        import torch
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            print("[GPU CLEANUP] GPU memory freed, ready for generation")
+    except Exception as e:
+        print(f"[GPU CLEANUP] Warning: {e}")
+    
     # Lock the session
     active_session_lock["in_progress"] = True
     active_session_lock["run_id"] = run_id
