@@ -9,21 +9,21 @@ REM 현재 디렉토리 저장
 set "PROJECT_DIR=%~dp0"
 
 REM 1. ComfyUI 실행
-echo 1. ComfyUI 실행 중...
+echo 1. ComfyUI running
 start "ComfyUI" cmd /k "cd /d %PROJECT_DIR% && venv\Scripts\activate.bat && cd ComfyUI && python main.py"
 
 REM 2초 대기
 timeout /t 2 /nobreak >nul
 
 REM 2. FastAPI 서버 실행 (가상환경 활성화)
-echo 2. FastAPI 서버 실행 중 (가상환경 포함)...
+echo 2. FastAPI server running(including virtual environment)...
 start "FastAPI Server" cmd /k "cd /d %PROJECT_DIR% && venv\Scripts\activate.bat && uvicorn server:app --host 127.0.0.1 --port 8000 --reload"
 
 REM 3초 대기
 timeout /t 3 /nobreak >nul
 
 REM 3. Localtunnel 실행
-echo 3. Localtunnel 실행 중...
+echo 3. Localtunnel running...
 start "Localtunnel" cmd /k "cd /d %PROJECT_DIR% && powershell -ExecutionPolicy Bypass -File start_tunnel.ps1"
 
 echo.
