@@ -24,4 +24,16 @@ def validate_panels(obj: dict):
             assert summary_value, f"panel{idx}.summary empty"
             assert has_korean(summary_value), f"panel{idx}.summary should be Korean"
 
+            dialogue_items = panel.get("dialogue")
+            if idx in [2, 3]:
+                assert isinstance(dialogue_items, list) and dialogue_items, f"panel{idx}.dialogue must be a non-empty list"
+                for dialogue_idx, item in enumerate(dialogue_items, start=1):
+                    assert isinstance(item, dict), f"panel{idx}.dialogue[{dialogue_idx}] must be an object"
+                    character_value = str(item.get("character", "")).strip()
+                    text_value = str(item.get("text", "")).strip()
+                    assert character_value, f"panel{idx}.dialogue[{dialogue_idx}].character empty"
+                    assert text_value, f"panel{idx}.dialogue[{dialogue_idx}].text empty"
+                    assert has_korean(text_value), f"panel{idx}.dialogue[{dialogue_idx}].text should be Korean"
+            else:
+                assert "dialogue" not in panel, f"panel{idx}.dialogue should not be present"
 
