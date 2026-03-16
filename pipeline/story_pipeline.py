@@ -6,13 +6,48 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from models import Status, Stage
+from models import DialogueLine, Status, Stage
 from run_manager import RunManager, RunState
 from pipeline.image_gen import generate_story_images
 from pipeline.tts_gen import generate_page_audio
 
 # Import existing story generation logic
 from run_story import generate_story
+
+
+def _resolve_dialogue_voice(run_state: RunState, character: str) -> str:
+    return run_state.tts_config.character_voices.get(character, run_state.tts_config.dialogue_voice)
+
+
+def _extract_dialogues(run_state: RunState, panel: dict) -> list[DialogueLine]:
+    dialogues: list[DialogueLine] = []
+
+    for item in panel.get("dialogue", []) or []:
+        character = str(item.get("character", "")).strip()
+        text = str(item.get("text", "")).strip()
+        if not character or not text:
+            continue
+
+        dialogues.append(
+            DialogueLine(
+                character=character,
+                text=text,
+                voice=_resolve_dialogue_voice(run_state, character),
+            )
+        )
+
+    return dialogues
+
+
+def _build_page_text(summary: str, dialogues: list[DialogueLine]) -> str:
+    parts = []
+    if summary.strip():
+        parts.append(summary.strip())
+
+    for dialogue in dialogues:
+        parts.append(f'{dialogue.character}: "{dialogue.text}"')
+
+    return "\n".join(parts)
 
 
 async def run_story_pipeline(run_id: str, run_manager: RunManager):
@@ -35,6 +70,41 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
     run_dir = run_manager.get_run_dir(run_id)
     # make_panel.json is in project root, not pipeline folder
     workflow_path = Path(__file__).parent.parent / "make_panel.json"
+    loop = asyncio.get_event_loop()
+
+    async def cleanup_system_state(reason: str):
+        """Best-effort cleanup so the next run starts from a known-good state."""
+        print(f"[CLEANUP] Resetting system state ({reason})...")
+
+        try:
+            from pipeline.image_gen import ComfyUIClient
+            await loop.run_in_executor(None, lambda: ComfyUIClient().free_memory())
+        except Exception as e:
+            print(f"[CLEANUP] ComfyUI memory cleanup failed: {e}")
+
+        try:
+            import gc
+            import torch
+
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+        except Exception as e:
+            print(f"[CLEANUP] Torch CUDA cleanup failed: {e}")
+
+        try:
+            import subprocess
+            import sys
+
+            if sys.platform == "win32":
+                subprocess.run(
+                    ["taskkill", "/F", "/IM", "llama-cli.exe"],
+                    capture_output=True,
+                    check=False
+                )
+        except Exception as e:
+            print(f"[CLEANUP] LLM process cleanup failed: {e}")
     
     try:
         # Update status to RUNNING
@@ -48,21 +118,8 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         
         # SYSTEM CLEANUP: Force clean state before starting
         # 1. Kill any zombie LLM processes
-        import subprocess
-        import sys
-        if sys.platform == "win32":
-            subprocess.run(["taskkill", "/F", "/IM", "llama-cli.exe"], 
-                         capture_output=True, check=False)
-        
-        # 2. Free any GPU memory from previous image generation
-        try:
-             # We need to import ComfyUIClient here as it's not imported yet
-            from pipeline.image_gen import ComfyUIClient
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, lambda: ComfyUIClient().free_memory())
-            print("System cleaned up: LLM processes killed, GPU memory freed.")
-        except Exception as e:
-            print(f"Warning: Cleanup failed: {e}")
+        await cleanup_system_state("before pipeline start")
+        print("System cleaned up: LLM processes killed, GPU memory freed.")
 
         
         # Stage 1: LLM - Generate story
@@ -77,7 +134,6 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         # Run LLM in executor to avoid blocking
         print(f"\n[TIMING] Starting LLM generation for run {run_id}...")
         llm_start = time.time()
-        loop = asyncio.get_event_loop()
         story_obj = await loop.run_in_executor(
             None,
             generate_story,
@@ -93,7 +149,7 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         # story_obj = {"panels": [{"panel": 0, "subject": "...", "prompt": "..."}, ...]}
         panels = story_obj.get("panels", [])
         
-        # Panel 0 has "subject" (title), panels 1-4 have "summary" (content)
+        # Panel 0 has "subject" (title), panels 1-4 have "summary" and optional dialogue.
         cover_panel = next((p for p in panels if p.get("panel") == 0), {})
         cover_title = cover_panel.get("subject", "")
         cover_prompt = cover_panel.get("prompt", "")
@@ -101,22 +157,28 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         story_panels = [p for p in panels if p.get("panel") in [1, 2, 3, 4]]
         story_panels.sort(key=lambda x: x.get("panel", 0))
         
+        prepared_story_panels = []
+
         # Update page content
-        run_state.set_page_content(0, title=cover_title)
-        for i, panel in enumerate(story_panels[:4], start=1):
-            summary = panel.get("summary", "")
-            run_state.set_page_content(i, summary=summary)
+        run_state.set_page_content(0, title=cover_title, dialogues=[])
+        for panel in story_panels[:4]:
+            page_num = panel.get("panel", 0)
+            summary = str(panel.get("summary", "")).strip()
+            dialogues = _extract_dialogues(run_state, panel)
+            page_text = _build_page_text(summary, dialogues)
+
+            prepared_story_panels.append({
+                "page_num": page_num,
+                "prompt": panel.get("prompt", ""),
+                "summary": summary,
+                "content": page_text,
+                "dialogues": dialogues,
+            })
+            run_state.set_page_content(page_num, summary=page_text, dialogues=dialogues)
         
         # Stage 2-6: Generate images
         # Prepare prompts for image generation from "prompt" field
-        panel_descriptions = []
-        # Use cover prompt for panel 0
-        panel_descriptions_all = [cover_prompt] + [p.get("prompt", "") for p in story_panels[:4]]
-        
-        # For story panels (1-4), use their prompts
-        for panel in story_panels[:4]:
-            desc = panel.get("prompt", "")
-            panel_descriptions.append(desc)
+        panel_descriptions = [panel["prompt"] for panel in prepared_story_panels]
         
         # Generate all images (cover + 4 panels)
         # For now, we'll do this synchronously but update stage for each
@@ -192,9 +254,10 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             })
         
         # Prepare all audio generation tasks
-        async def generate_single_audio(page_num: int, text: str):
+        async def generate_single_audio(page_num: int, summary_text: str, dialogues: Optional[list[DialogueLine]] = None):
             """Generate a single audio"""
-            if not run_state.tts_enabled or not text.strip():
+            has_dialogue = any(dialogue.text.strip() for dialogue in (dialogues or []))
+            if not run_state.tts_enabled or (not summary_text.strip() and not has_dialogue):
                 return
             
             page_name = "Cover" if page_num == 0 else f"Page {page_num}"
@@ -204,11 +267,11 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             filename = await loop.run_in_executor(
                 None,
                 generate_page_audio,
-                text,
+                summary_text,
+                [dialogue.model_dump() for dialogue in (dialogues or [])],
                 page_num,
                 run_dir,
-                "M2",
-                "ko"
+                run_state.tts_config.model_dump()
             )
             
             audio_end = time.time()
@@ -228,11 +291,13 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         audio_coroutines = []
         
         # Cover (page 0) audio
-        audio_coroutines.append(generate_single_audio(0, cover_title))
+        audio_coroutines.append(generate_single_audio(0, cover_title, []))
         
         # Panels 1-4 audio
-        for i, summary in enumerate([p.get("summary", "") for p in story_panels[:4]], start=1):
-            audio_coroutines.append(generate_single_audio(i, summary))
+        for panel in prepared_story_panels:
+            audio_coroutines.append(
+                generate_single_audio(panel["page_num"], panel["summary"], panel["dialogues"])
+            )
         
         # Start all audio tasks in background
         if audio_coroutines:
@@ -277,6 +342,8 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
         })
         
     except Exception as e:
+        await cleanup_system_state("pipeline failure")
+
         # Mark as FAILED
         run_state.status = Status.FAILED
         run_state.error = str(e)
@@ -290,4 +357,6 @@ async def run_story_pipeline(run_id: str, run_manager: RunManager):
             "ready_max_audio_page": run_state.ready_max_audio_page,
             "error": str(e)
         })
+    finally:
+        await cleanup_system_state("pipeline end")
 

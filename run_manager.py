@@ -10,19 +10,29 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from models import Status, Stage, PageInfo, RunStateResponse
+from models import DialogueLine, PageInfo, RunStateResponse, Status, Stage, TTSConfig
 
 
 class RunState:
     """State for a single run"""
     
-    def __init__(self, run_id: str, era: str, place: str, characters: str, topic: str, tts_enabled: bool):
+    def __init__(
+        self,
+        run_id: str,
+        era: str,
+        place: str,
+        characters: str,
+        topic: str,
+        tts_enabled: bool,
+        tts_config: Optional[TTSConfig] = None,
+    ):
         self.run_id = run_id
         self.era = era
         self.place = place
         self.characters = characters
         self.topic = topic
         self.tts_enabled = tts_enabled
+        self.tts_config = tts_config or TTSConfig()
         
         self.status = Status.QUEUED
         self.stage = Stage.LLM
@@ -33,7 +43,7 @@ class RunState:
         
         # Initialize pages array with 5 empty pages
         self.pages = [
-            PageInfo(page=i, title="", summary="", image_url="", audio_url="")
+            PageInfo(page=i, title="", summary="", dialogues=[], image_url="", audio_url="")
             for i in range(5)
         ]
     
@@ -60,13 +70,21 @@ class RunState:
             self.pages[page].audio_url = f"/api/runs/{self.run_id}/audio/{filename}"
             self.ready_max_audio_page = max(self.ready_max_audio_page, page)
     
-    def set_page_content(self, page: int, title: str = "", summary: str = ""):
+    def set_page_content(
+        self,
+        page: int,
+        title: Optional[str] = None,
+        summary: Optional[str] = None,
+        dialogues: Optional[list[DialogueLine]] = None,
+    ):
         """Set text content for a page"""
         if 0 <= page < 5:
-            if title:
+            if title is not None:
                 self.pages[page].title = title
-            if summary:
+            if summary is not None:
                 self.pages[page].summary = summary
+            if dialogues is not None:
+                self.pages[page].dialogues = dialogues
 
 
 class RunManager:
@@ -81,13 +99,21 @@ class RunManager:
         # Create outputs directory
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
     
-    def create_run(self, era: str, place: str, characters: str, topic: str, tts_enabled: bool = True) -> str:
+    def create_run(
+        self,
+        era: str,
+        place: str,
+        characters: str,
+        topic: str,
+        tts_enabled: bool = True,
+        tts_config: Optional[TTSConfig] = None,
+    ) -> str:
         """Create a new run and return its ID"""
         # Generate timestamp-based ID: YYYYMMDD_HHMMSS_short_uuid
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         short_id = uuid4().hex[:6]  # 6 characters for uniqueness
         run_id = f"{timestamp}_{short_id}"
-        run_state = RunState(run_id, era, place, characters, topic, tts_enabled)
+        run_state = RunState(run_id, era, place, characters, topic, tts_enabled, tts_config=tts_config)
         self.runs[run_id] = run_state
         
         # Create output directory for this run

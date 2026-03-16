@@ -1,6 +1,6 @@
 """
 FastAPI server for storybook generation
-External API Specification v2.0 compliant
+External API Specification v2.1 compliant
 """
 import asyncio
 from pathlib import Path
@@ -28,8 +28,8 @@ from pipeline.story_pipeline import run_story_pipeline
 # Create FastAPI app
 app = FastAPI(
     title="Storybook Generation API",
-    description="External API v2.0 for generating children's storybooks",
-    version="2.0.0"
+    description="External API v2.1 for generating children's storybooks",
+    version="2.1.0"
 )
 
 # Add CORS middleware
@@ -72,7 +72,7 @@ async def root():
     index_file = static_dir / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
-    return {"status": "ok", "version": "2.0.0"}
+    return {"status": "ok", "version": "2.1.0"}
 
 
 @app.post("/api/stt/field", response_model=FieldSTTResponse)
@@ -154,7 +154,8 @@ async def create_run(request: CreateRunRequest, background_tasks: BackgroundTask
         place=request.place_ko,
         characters=request.characters_ko,
         topic=request.topic_ko,
-        tts_enabled=request.tts_enabled
+        tts_enabled=request.tts_enabled,
+        tts_config=request.tts_config
     )
     
     # Clean GPU memory BEFORE starting generation (ensures clean state)
