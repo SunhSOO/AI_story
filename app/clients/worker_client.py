@@ -61,6 +61,14 @@ class WorkerClient:
                 resp.raise_for_status()
                 return await resp.read()
 
+    async def unload_tts(self) -> None:
+        try:
+            async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:
+                async with session.post(f"{self.base_url}/tts/unload") as resp:
+                    resp.raise_for_status()
+        except Exception as e:
+            print(f"[WORKER TTS UNLOAD] {e}")
+
     async def cleanup(self) -> None:
         try:
             async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:

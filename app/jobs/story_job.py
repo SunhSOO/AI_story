@@ -42,18 +42,7 @@ async def _cleanup_system(reason: str, worker=None) -> None:
     print(f"[CLEANUP] {reason}")
     loop = asyncio.get_event_loop()
 
-    try:
-        if sys.platform == "win32":
-            await loop.run_in_executor(
-                None,
-                lambda: subprocess.run(
-                    ["taskkill", "/F", "/IM", "llama-cli.exe"], capture_output=True, check=False
-                ),
-            )
-    except Exception as e:
-        print(f"[CLEANUP] llama-cli kill: {e}")
-
-    await asyncio.sleep(1.5)
+    await asyncio.sleep(1.0)
 
     try:
         gc.collect()
@@ -158,6 +147,10 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 run_state.set_scene_audio(scene_no, filename)
                 await _emit(run_state, {"scene_no": scene_no, "audio": filename})
                 print(f"[WORKER] TTS scene {scene_no} done")
+
+            # TTS 모델 언로드 → ComfyUI VRAM 확보
+            await worker.unload_tts()
+            print("[WORKER] TTS model unloaded")
 
             # 표지 이미지
             print("[WORKER] Generating cover image on 5080...")

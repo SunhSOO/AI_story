@@ -58,6 +58,13 @@ async def tts_generate(req: TTSRequest):
     return Response(content=wav_bytes, media_type="audio/wav")
 
 
+@app.post("/tts/unload")
+async def tts_unload():
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _unload_tts)
+    return {"status": "ok"}
+
+
 @app.post("/cleanup")
 async def cleanup():
     loop = asyncio.get_event_loop()
@@ -103,12 +110,31 @@ def _generate_tts_bytes(req: TTSRequest) -> bytes:
         return output_path.read_bytes()
 
 
-def _do_cleanup() -> None:
+def _unload_tts() -> None:
     try:
+        import gc
         from app.clients.voxcpm2_client import unload_model
         unload_model()
+        gc.collect()
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print("[WORKER] TTS model unloaded from VRAM")
     except Exception as e:
         print(f"[CLEANUP] TTS unload: {e}")
+
+
+def _do_cleanup() -> None:
+    import subprocess, sys
+
+    # llama-cli 프로세스 강제 종료 (혹시 남아있을 경우)
+    if sys.platform == "win32":
+        try:
+            subprocess.run(["taskkill", "/F", "/IM", "llama-cli.exe"], capture_output=True, check=False)
+        except Exception as e:
+            print(f"[CLEANUP] llama-cli kill: {e}")
+
+    _unload_tts()
 
     try:
         from app.clients.comfyui_client import ComfyUIClient
