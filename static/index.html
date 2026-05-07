@@ -10,7 +10,7 @@
   <div class="container">
     <h1>AI 동화책 생성기</h1>
 
-    <!-- ── 입력 화면 1: 시대 ── -->
+    <!-- ── 입력 1: 시대 ── -->
     <div class="screen active" id="screen-era">
       <div class="progress-bar"><span class="progress-fill" style="width:25%"></span></div>
       <p class="progress-label">1 / 4</p>
@@ -27,7 +27,7 @@
       </div>
     </div>
 
-    <!-- ── 입력 화면 2: 장소 ── -->
+    <!-- ── 입력 2: 장소 ── -->
     <div class="screen" id="screen-place">
       <div class="progress-bar"><span class="progress-fill" style="width:50%"></span></div>
       <p class="progress-label">2 / 4</p>
@@ -45,7 +45,7 @@
       </div>
     </div>
 
-    <!-- ── 입력 화면 3: 등장인물 ── -->
+    <!-- ── 입력 3: 등장인물 ── -->
     <div class="screen" id="screen-characters">
       <div class="progress-bar"><span class="progress-fill" style="width:75%"></span></div>
       <p class="progress-label">3 / 4</p>
@@ -63,7 +63,7 @@
       </div>
     </div>
 
-    <!-- ── 입력 화면 4: 주제 ── -->
+    <!-- ── 입력 4: 주제 ── -->
     <div class="screen" id="screen-topic">
       <div class="progress-bar"><span class="progress-fill" style="width:100%"></span></div>
       <p class="progress-label">4 / 4</p>
@@ -81,7 +81,7 @@
       </div>
     </div>
 
-    <!-- ── 표지 화면 ── -->
+    <!-- ── 표지 ── -->
     <div class="screen" id="screen-cover">
       <p class="page-label">표지</p>
 
@@ -95,6 +95,7 @@
         <div class="image-wrap">
           <img id="cover-img" class="story-img" alt="표지 이미지">
         </div>
+        <audio class="audio-player" id="cover-audio" controls style="display:none"></audio>
       </div>
 
       <div class="btn-row">
@@ -102,116 +103,136 @@
       </div>
     </div>
 
-    <!-- ── 장면 화면 1 ── -->
+    <!-- ── 장면 1 ── -->
     <div class="screen" id="screen-scene-1">
       <p class="page-label">1 / 4</p>
-
       <div class="loading-block" id="scene-loading-1">
         <div class="spinner"></div>
-        <p>첫 번째 장면을 그리는 중...</p>
+        <p>첫 번째 장면을 준비하는 중...</p>
       </div>
-
       <div class="story-content" id="scene-content-1">
         <span class="emotion-badge" id="scene-emotion-1"></span>
         <h3 class="scene-title" id="scene-title-1"></h3>
         <p class="narration" id="scene-narration-1"></p>
         <p class="dialogue" id="scene-dialogue-1"></p>
-        <div class="carousel">
-          <button class="carousel-btn" id="img-prev-1" onclick="prevImage(1)" disabled>&#9664;</button>
-          <img class="story-img" id="scene-img-1" alt="장면 1">
-          <button class="carousel-btn" id="img-next-1" onclick="nextImage(1)" disabled>&#9654;</button>
+        <div class="panels">
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-1-1"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-1-1" alt="" style="display:none">
+          </div>
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-1-2"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-1-2" alt="" style="display:none">
+          </div>
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-1-3"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-1-3" alt="" style="display:none">
+          </div>
         </div>
-        <p class="img-indicator" id="img-indicator-1"></p>
         <audio class="audio-player" id="scene-audio-1" controls></audio>
       </div>
-
       <div class="btn-row">
         <button class="btn-secondary" onclick="goToCover()">이전</button>
         <button class="btn-primary" id="scene-next-1" onclick="goToScene(2)" disabled>다음 장면</button>
       </div>
     </div>
 
-    <!-- ── 장면 화면 2 ── -->
+    <!-- ── 장면 2 ── -->
     <div class="screen" id="screen-scene-2">
       <p class="page-label">2 / 4</p>
-
       <div class="loading-block" id="scene-loading-2">
         <div class="spinner"></div>
-        <p>두 번째 장면을 그리는 중...</p>
+        <p>두 번째 장면을 준비하는 중...</p>
       </div>
-
       <div class="story-content" id="scene-content-2">
         <span class="emotion-badge" id="scene-emotion-2"></span>
         <h3 class="scene-title" id="scene-title-2"></h3>
         <p class="narration" id="scene-narration-2"></p>
         <p class="dialogue" id="scene-dialogue-2"></p>
-        <div class="carousel">
-          <button class="carousel-btn" id="img-prev-2" onclick="prevImage(2)" disabled>&#9664;</button>
-          <img class="story-img" id="scene-img-2" alt="장면 2">
-          <button class="carousel-btn" id="img-next-2" onclick="nextImage(2)" disabled>&#9654;</button>
+        <div class="panels">
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-2-1"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-2-1" alt="" style="display:none">
+          </div>
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-2-2"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-2-2" alt="" style="display:none">
+          </div>
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-2-3"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-2-3" alt="" style="display:none">
+          </div>
         </div>
-        <p class="img-indicator" id="img-indicator-2"></p>
         <audio class="audio-player" id="scene-audio-2" controls></audio>
       </div>
-
       <div class="btn-row">
         <button class="btn-secondary" onclick="goToScene(1)">이전</button>
         <button class="btn-primary" id="scene-next-2" onclick="goToScene(3)" disabled>다음 장면</button>
       </div>
     </div>
 
-    <!-- ── 장면 화면 3 ── -->
+    <!-- ── 장면 3 ── -->
     <div class="screen" id="screen-scene-3">
       <p class="page-label">3 / 4</p>
-
       <div class="loading-block" id="scene-loading-3">
         <div class="spinner"></div>
-        <p>세 번째 장면을 그리는 중...</p>
+        <p>세 번째 장면을 준비하는 중...</p>
       </div>
-
       <div class="story-content" id="scene-content-3">
         <span class="emotion-badge" id="scene-emotion-3"></span>
         <h3 class="scene-title" id="scene-title-3"></h3>
         <p class="narration" id="scene-narration-3"></p>
         <p class="dialogue" id="scene-dialogue-3"></p>
-        <div class="carousel">
-          <button class="carousel-btn" id="img-prev-3" onclick="prevImage(3)" disabled>&#9664;</button>
-          <img class="story-img" id="scene-img-3" alt="장면 3">
-          <button class="carousel-btn" id="img-next-3" onclick="nextImage(3)" disabled>&#9654;</button>
+        <div class="panels">
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-3-1"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-3-1" alt="" style="display:none">
+          </div>
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-3-2"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-3-2" alt="" style="display:none">
+          </div>
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-3-3"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-3-3" alt="" style="display:none">
+          </div>
         </div>
-        <p class="img-indicator" id="img-indicator-3"></p>
         <audio class="audio-player" id="scene-audio-3" controls></audio>
       </div>
-
       <div class="btn-row">
         <button class="btn-secondary" onclick="goToScene(2)">이전</button>
         <button class="btn-primary" id="scene-next-3" onclick="goToScene(4)" disabled>다음 장면</button>
       </div>
     </div>
 
-    <!-- ── 장면 화면 4 (마지막) ── -->
+    <!-- ── 장면 4 (마지막) ── -->
     <div class="screen" id="screen-scene-4">
       <p class="page-label">4 / 4 &mdash; 마지막 장면</p>
-
       <div class="loading-block" id="scene-loading-4">
         <div class="spinner"></div>
-        <p>마지막 장면을 그리는 중...</p>
+        <p>마지막 장면을 준비하는 중...</p>
       </div>
-
       <div class="story-content" id="scene-content-4">
         <span class="emotion-badge" id="scene-emotion-4"></span>
         <h3 class="scene-title" id="scene-title-4"></h3>
         <p class="narration" id="scene-narration-4"></p>
         <p class="dialogue" id="scene-dialogue-4"></p>
-        <div class="carousel">
-          <button class="carousel-btn" id="img-prev-4" onclick="prevImage(4)" disabled>&#9664;</button>
-          <img class="story-img" id="scene-img-4" alt="장면 4">
-          <button class="carousel-btn" id="img-next-4" onclick="nextImage(4)" disabled>&#9654;</button>
+        <div class="panels">
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-4-1"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-4-1" alt="" style="display:none">
+          </div>
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-4-2"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-4-2" alt="" style="display:none">
+          </div>
+          <div class="panel">
+            <div class="panel-spinner" id="panel-spinner-4-3"><div class="mini-spinner"></div></div>
+            <img class="panel-img" id="panel-img-4-3" alt="" style="display:none">
+          </div>
         </div>
-        <p class="img-indicator" id="img-indicator-4"></p>
         <audio class="audio-player" id="scene-audio-4" controls></audio>
       </div>
-
       <div class="btn-row">
         <button class="btn-secondary" onclick="goToScene(3)">이전</button>
         <button class="btn-primary" onclick="reset()">처음으로</button>
@@ -219,7 +240,6 @@
     </div>
 
   </div><!-- .container -->
-
   <script src="/static/app.js"></script>
 </body>
 </html>

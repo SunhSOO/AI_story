@@ -16,13 +16,11 @@ from app.services.run_service import RunRegistry, RunState
 # {scene_no: [img_idx, ...]}  img_idx는 1-based
 _WORKER_IMAGES: dict[int, list[int]] = {
     1: [1, 2, 3],   # 5080: scene1 전체
-    3: [1, 3],      # 5080: scene3 img1, img3
-    4: [1, 3],      # 5080: scene4 img1, img3
+    2: [1, 2, 3],   # 5080: scene2 전체
+    3: [1, 2, 3],   # 5080: scene3 전체
 }
 _LOCAL_IMAGES: dict[int, list[int]] = {
-    2: [1, 2, 3],   # 3080: scene2 전체 (TTS 완료 후)
-    3: [2],         # 3080: scene3 img2
-    4: [2],         # 3080: scene4 img2
+    4: [1, 2, 3],   # 3080: scene4 전체
 }
 
 

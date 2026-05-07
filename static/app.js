@@ -3,8 +3,8 @@
 const API = window.location.origin;
 
 // ── 입력 화면 상태 ────────────────────────────────────────────────────
-const INPUT_FIELDS   = ['era', 'place', 'characters', 'topic'];
-const INPUT_SCREENS  = INPUT_FIELDS.map(f => `screen-${f}`);
+const INPUT_FIELDS  = ['era', 'place', 'characters', 'topic'];
+const INPUT_SCREENS = INPUT_FIELDS.map(f => `screen-${f}`);
 let inputIdx = 0;
 
 // ── 생성 상태 ──────────────────────────────────────────────────────────
@@ -17,28 +17,33 @@ let mediaRecorder = null;
 let audioChunks   = [];
 
 // ── 미디어 상태 ────────────────────────────────────────────────────────
-let coverState = { url: '', loaded: false };
+function _makeCoverState() {
+  return { imgUrl: '', imgLoaded: false, audioUrl: '' };
+}
+function _makeSceneState() {
+  return {
+    metaReady: false,
+    panels: [
+      { url: '', loaded: false },
+      { url: '', loaded: false },
+      { url: '', loaded: false },
+    ],
+    audioUrl: '',
+  };
+}
 
-// sceneStates[0..3] → scene_no 1..4
-let sceneStates = Array.from({ length: 4 }, () => ({
-  imageUrls:   [],
-  imgIdx:      0,
-  imageLoaded: false,
-  audioUrl:    '',
-  audioLoaded: false,
-}));
+let coverState  = _makeCoverState();
+let sceneStates = Array.from({ length: 4 }, _makeSceneState);
 
-// 현재 보고 있는 화면
-let currentView = null; // 'cover' | 1..4
+let currentView = null;
 
 // ── 화면 전환 ────────────────────────────────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
-
-function goToCover()    { currentView = 'cover'; showScreen('screen-cover'); }
-function goToScene(n)   { currentView = n;       showScreen(`screen-scene-${n}`); }
+function goToCover()  { currentView = 'cover'; showScreen('screen-cover'); }
+function goToScene(n) { currentView = n;       showScreen(`screen-scene-${n}`); }
 
 // ── 입력 화면 이동 ────────────────────────────────────────────────────
 function nextInput() {
@@ -52,43 +57,34 @@ function nextInput() {
     showScreen(INPUT_SCREENS[inputIdx]);
   }
 }
-
 function prevInput() {
-  if (inputIdx > 0) {
-    inputIdx--;
-    showScreen(INPUT_SCREENS[inputIdx]);
-  }
+  if (inputIdx > 0) { inputIdx--; showScreen(INPUT_SCREENS[inputIdx]); }
 }
 
 // ── STT ──────────────────────────────────────────────────────────────
 async function startSTT(fieldType) {
-  const btn       = event.currentTarget;
-  const statusEl  = document.getElementById(`${fieldType}-status`);
+  const btn      = event.currentTarget;
+  const statusEl = document.getElementById(`${fieldType}-status`);
 
   if (!navigator.mediaDevices?.getUserMedia) {
     alert('이 브라우저는 마이크를 지원하지 않습니다.');
     return;
   }
-
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioChunks  = [];
-
     const mime = ['audio/webm','audio/mp4','audio/mpeg','audio/wav']
       .find(t => MediaRecorder.isTypeSupported(t)) || '';
     mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
-
     mediaRecorder.ondataavailable = e => { if (e.data.size) audioChunks.push(e.data); };
     mediaRecorder.onstop = async () => {
       const blob = new Blob(audioChunks, { type: mime || 'audio/webm' });
       stream.getTracks().forEach(t => t.stop());
       await sendSTT(blob, fieldType, mime);
     };
-
     btn.classList.add('recording');
     statusEl.textContent = '녹음 중... (다시 클릭하면 종료)';
     mediaRecorder.start();
-
     btn.onclick = () => {
       if (mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
@@ -107,11 +103,9 @@ async function sendSTT(blob, fieldType, mime) {
   const ext = mime.includes('mp4') ? 'mp4'
             : mime.includes('mpeg') ? 'mp3'
             : mime.includes('wav')  ? 'wav' : 'webm';
-
   const form = new FormData();
   form.append('audio_file', blob, `rec.${ext}`);
   form.append('field_type', fieldType);
-
   try {
     const res  = await fetch(`${API}/api/stt/field`, { method: 'POST', body: form });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -133,14 +127,11 @@ async function startGeneration() {
   const place      = document.getElementById('place').value.trim();
   const characters = document.getElementById('characters').value.trim();
   const topic      = document.getElementById('topic').value.trim();
-
   if (!era || !place || !characters || !topic) {
     alert('모든 항목을 입력해주세요!');
     return;
   }
-
   _resetStoryState();
-
   try {
     const res = await fetch(`${API}/api/runs`, {
       method:  'POST',
@@ -154,7 +145,6 @@ async function startGeneration() {
     alert('생성 요청 실패: ' + err.message);
     return;
   }
-
   goToCover();
   _startMonitoring();
 }
@@ -163,7 +153,6 @@ async function startGeneration() {
 function _startMonitoring() {
   eventSource = new EventSource(`${API}/api/runs/${runId}/events`);
   pollTimer   = setInterval(refresh, 2500);
-
   eventSource.addEventListener('update', async e => {
     const data = JSON.parse(e.data);
     await refresh();
@@ -175,8 +164,7 @@ function _startMonitoring() {
       }
     }
   });
-
-  eventSource.onerror = () => {}; // keep alive, suppress console noise
+  eventSource.onerror = () => {};
 }
 
 function _stopMonitoring() {
@@ -201,7 +189,6 @@ async function refresh() {
 
 // ── 표지 렌더링 ───────────────────────────────────────────────────────
 function _renderCover(data) {
-  // 로딩 메시지
   const STAGE_MSG = {
     LLM:      '동화 스토리를 생성하는 중...',
     IMAGE:    '이미지를 그리는 중...',
@@ -211,27 +198,37 @@ function _renderCover(data) {
   const msgEl = document.getElementById('cover-loading-msg');
   if (msgEl && data.stage) msgEl.textContent = STAGE_MSG[data.stage] || '';
 
-  // 제목
   if (data.story_title) {
     document.getElementById('cover-title').textContent = data.story_title;
   }
 
   // 표지 이미지
-  if (data.cover_image_url && data.cover_image_url !== coverState.url) {
-    coverState.url    = data.cover_image_url;
-    coverState.loaded = false;
+  if (data.cover_image_url && data.cover_image_url !== coverState.imgUrl) {
+    coverState.imgUrl    = data.cover_image_url;
+    coverState.imgLoaded = false;
     const img = document.getElementById('cover-img');
-    img.onload  = () => { coverState.loaded = true; _syncCoverVisibility(); _updateNavButtons(); };
-    img.onerror = () => { coverState.url = ''; };
+    img.onload  = () => { coverState.imgLoaded = true; _syncCoverVisibility(); _updateNavButtons(); };
+    img.onerror = () => { coverState.imgUrl = ''; };
     img.src = API + data.cover_image_url + '?t=' + Date.now();
+  }
+
+  // 표지 오디오
+  if (data.cover_audio_url && data.cover_audio_url !== coverState.audioUrl) {
+    coverState.audioUrl = data.cover_audio_url;
+    const audio = document.getElementById('cover-audio');
+    if (audio) {
+      audio.src = API + data.cover_audio_url + '?t=' + Date.now();
+      audio.load();
+      audio.style.display = '';
+    }
   }
 
   _syncCoverVisibility();
 }
 
 function _syncCoverVisibility() {
-  const ready = !!(coverState.url && coverState.loaded);
-  document.getElementById('cover-loading').style.display  = ready ? 'none' : '';
+  const ready   = !!(coverState.imgUrl && coverState.imgLoaded);
+  document.getElementById('cover-loading').style.display = ready ? 'none' : '';
   const content = document.getElementById('cover-content');
   content.style.display = ready ? 'flex' : 'none';
   content.classList.toggle('visible', ready);
@@ -243,102 +240,79 @@ function _renderScene(i, scene) {
   const n  = i + 1;
   const st = sceneStates[i];
 
-  // 텍스트
-  _setText(`scene-title-${n}`,    scene.title    || '');
-  _setText(`scene-narration-${n}`, scene.narration || '');
-  _setText(`scene-dialogue-${n}`, scene.dialogue  || '');
-
-  // 감정 배지
-  const badge = document.getElementById(`scene-emotion-${n}`);
-  const emotion = scene.dialogue_emotion || scene.narration_emotion || '';
-  if (badge && emotion) {
-    badge.textContent = _emotionLabel(emotion);
-    badge.dataset.emotion = emotion;
+  // 텍스트 & 메타
+  if (scene.title && !st.metaReady) {
+    _setText(`scene-title-${n}`,     scene.title    || '');
+    _setText(`scene-narration-${n}`, scene.narration || '');
+    _setText(`scene-dialogue-${n}`,  scene.dialogue  || '');
+    const badge   = document.getElementById(`scene-emotion-${n}`);
+    const emotion = scene.dialogue_emotion || scene.narration_emotion || '';
+    if (badge && emotion) {
+      badge.textContent    = _emotionLabel(emotion);
+      badge.dataset.emotion = emotion;
+    }
+    st.metaReady = true;
+    _syncSceneVisibility(n, i);
   }
 
-  // 이미지 URL 목록 갱신
+  // 패널 이미지 — 도착한 것만 독립적으로 로드
   const urls = scene.image_urls || [];
-  if (urls.length && JSON.stringify(urls) !== JSON.stringify(st.imageUrls)) {
-    st.imageUrls   = urls;
-    st.imgIdx      = 0;
-    st.imageLoaded = false;
-    _loadSceneImage(n, i);
-  }
+  urls.forEach((url, j) => {
+    if (j >= 3) return;
+    if (url && url !== st.panels[j].url) {
+      st.panels[j].url    = url;
+      st.panels[j].loaded = false;
+      _loadPanel(n, j, url);
+    }
+  });
 
   // 오디오
   if (scene.audio_url && scene.audio_url !== st.audioUrl) {
-    st.audioUrl    = scene.audio_url;
-    st.audioLoaded = false;
+    st.audioUrl = scene.audio_url;
     const audio = document.getElementById(`scene-audio-${n}`);
     if (audio) {
-      audio.oncanplay = () => { st.audioLoaded = true; };
       audio.src = API + scene.audio_url + '?t=' + Date.now();
       audio.load();
     }
   }
-
-  _syncSceneVisibility(n, i);
 }
 
-function _loadSceneImage(n, i) {
-  const st  = sceneStates[i];
-  const img = document.getElementById(`scene-img-${n}`);
+// 패널 j (0-based) 이미지 로드
+function _loadPanel(n, j, url) {
+  const img     = document.getElementById(`panel-img-${n}-${j + 1}`);
+  const spinner = document.getElementById(`panel-spinner-${n}-${j + 1}`);
   if (!img) return;
-  img.onload  = () => { st.imageLoaded = true; _syncSceneVisibility(n, i); _updateNavButtons(); };
-  img.onerror = () => { st.imageLoaded = false; st.imageUrls = []; };
-  img.src = API + st.imageUrls[st.imgIdx] + '?t=' + Date.now();
-  _updateCarouselControls(n, i);
+  img.style.display = 'none';
+  if (spinner) spinner.style.display = '';
+  img.onload = () => {
+    sceneStates[n - 1].panels[j].loaded = true;
+    img.style.display = '';
+    if (spinner) spinner.style.display = 'none';
+    _updateNavButtons();
+  };
+  img.onerror = () => {};
+  img.src = API + url + '?t=' + Date.now();
 }
 
 function _syncSceneVisibility(n, i) {
-  const st    = sceneStates[i];
-  const ready = st.imageUrls.length > 0 && st.imageLoaded;
-  document.getElementById(`scene-loading-${n}`).style.display  = ready ? 'none' : '';
+  const ready   = sceneStates[i].metaReady;
+  document.getElementById(`scene-loading-${n}`).style.display = ready ? 'none' : '';
   const content = document.getElementById(`scene-content-${n}`);
   content.style.display = ready ? 'flex' : 'none';
   content.classList.toggle('visible', ready);
 }
 
-// ── 이미지 캐러셀 ─────────────────────────────────────────────────────
-function prevImage(n) {
-  const i  = n - 1;
-  const st = sceneStates[i];
-  if (st.imgIdx > 0) { st.imgIdx--; st.imageLoaded = false; _loadSceneImage(n, i); }
-}
-
-function nextImage(n) {
-  const i  = n - 1;
-  const st = sceneStates[i];
-  if (st.imgIdx < st.imageUrls.length - 1) { st.imgIdx++; st.imageLoaded = false; _loadSceneImage(n, i); }
-}
-
-function _updateCarouselControls(n, i) {
-  const st    = sceneStates[i];
-  const total = st.imageUrls.length;
-  const prev  = document.getElementById(`img-prev-${n}`);
-  const next  = document.getElementById(`img-next-${n}`);
-  const ind   = document.getElementById(`img-indicator-${n}`);
-  if (prev) prev.disabled = st.imgIdx === 0;
-  if (next) next.disabled = st.imgIdx >= total - 1;
-  if (ind)  ind.textContent = total ? `${st.imgIdx + 1} / ${total}` : '';
-}
-
-// ── 내비게이션 버튼 상태 갱신 ────────────────────────────────────────
+// ── 내비게이션 버튼 상태 ─────────────────────────────────────────────
 function _updateNavButtons() {
-  // 표지 → 장면 1
+  // 표지 → 1장: 표지 이미지가 로드돼야 활성화
   const coverNext = document.getElementById('cover-next');
-  if (coverNext) coverNext.disabled = !_isSceneReady(0);
+  if (coverNext) coverNext.disabled = !coverState.imgLoaded;
 
-  // 장면 N → 장면 N+1
+  // 장면 N → N+1: 다음 장면 텍스트가 준비돼야 활성화
   for (let i = 0; i < 3; i++) {
     const btn = document.getElementById(`scene-next-${i + 1}`);
-    if (btn) btn.disabled = !_isSceneReady(i) || !_isSceneReady(i + 1);
+    if (btn) btn.disabled = !sceneStates[i + 1].metaReady;
   }
-}
-
-function _isSceneReady(i) {
-  const st = sceneStates[i];
-  return st.imageUrls.length > 0 && st.imageLoaded;
 }
 
 // ── 리셋 ─────────────────────────────────────────────────────────────
@@ -351,34 +325,38 @@ function reset() {
 }
 
 function _resetStoryState() {
-  runId      = null;
-  coverState = { url: '', loaded: false };
-  sceneStates = Array.from({ length: 4 }, () => ({
-    imageUrls: [], imgIdx: 0, imageLoaded: false, audioUrl: '', audioLoaded: false,
-  }));
+  runId       = null;
+  coverState  = _makeCoverState();
+  sceneStates = Array.from({ length: 4 }, _makeSceneState);
 
-  // 표지 화면 초기화
-  _syncCoverVisibility();
+  // 표지 초기화
   document.getElementById('cover-title').textContent = '';
-  const coverImg = document.getElementById('cover-img');
-  coverImg.src = '';
+  document.getElementById('cover-img').src = '';
+  const coverAudio = document.getElementById('cover-audio');
+  if (coverAudio) { coverAudio.src = ''; coverAudio.style.display = 'none'; coverAudio.load(); }
   document.getElementById('cover-loading-msg').textContent = '동화 스토리를 생성하는 중...';
-  document.getElementById('cover-loading').style.display = '';
+  document.getElementById('cover-loading').style.display  = '';
+  const coverContent = document.getElementById('cover-content');
+  coverContent.style.display = 'none';
+  coverContent.classList.remove('visible');
   document.getElementById('cover-next').disabled = true;
 
-  // 장면 화면 초기화
+  // 장면 초기화
   for (let n = 1; n <= 4; n++) {
-    const i = n - 1;
-    _setText(`scene-title-${n}`,    '');
-    _setText(`scene-narration-${n}`,'');
-    _setText(`scene-dialogue-${n}`, '');
+    _setText(`scene-title-${n}`,     '');
+    _setText(`scene-narration-${n}`, '');
+    _setText(`scene-dialogue-${n}`,  '');
     const badge = document.getElementById(`scene-emotion-${n}`);
     if (badge) { badge.textContent = ''; badge.dataset.emotion = ''; }
-    const img = document.getElementById(`scene-img-${n}`);
-    if (img)  img.src = '';
     const audio = document.getElementById(`scene-audio-${n}`);
     if (audio) { audio.src = ''; audio.load(); }
-    _updateCarouselControls(n, i);
+    // 패널 초기화
+    for (let j = 1; j <= 3; j++) {
+      const img = document.getElementById(`panel-img-${n}-${j}`);
+      if (img) { img.src = ''; img.style.display = 'none'; }
+      const spinner = document.getElementById(`panel-spinner-${n}-${j}`);
+      if (spinner) spinner.style.display = '';
+    }
     document.getElementById(`scene-loading-${n}`).style.display = '';
     const content = document.getElementById(`scene-content-${n}`);
     content.style.display = 'none';
@@ -405,6 +383,6 @@ const EMOTION_LABELS = {
   magical:  '신비',
 };
 
-function _emotionLabel(emotion) {
-  return EMOTION_LABELS[emotion] || emotion;
+function _emotionLabel(e) {
+  return EMOTION_LABELS[e] || e;
 }
