@@ -4,9 +4,16 @@ obj ::= "{" ws "\"panels\"" ws ":" ws "[" ws p0 ws "," ws p1 ws "," ws p2 ws ","
 
 p0 ::= "{" ws "\"panel\"" ws ":" ws "0" ws "," ws "\"subject\"" ws ":" ws string ws "," ws "\"prompt\"" ws ":" ws string ws "}"
 p1 ::= "{" ws "\"panel\"" ws ":" ws "1" ws "," ws "\"summary\"" ws ":" ws string ws "," ws "\"prompt\"" ws ":" ws string ws "}"
-p2 ::= "{" ws "\"panel\"" ws ":" ws "2" ws "," ws "\"summary\"" ws ":" ws string ws "," ws "\"prompt\"" ws ":" ws string ws "}"
-p3 ::= "{" ws "\"panel\"" ws ":" ws "3" ws "," ws "\"summary\"" ws ":" ws string ws "," ws "\"prompt\"" ws ":" ws string ws "}"
+p2 ::= "{" ws "\"panel\"" ws ":" ws "2" ws "," ws "\"summary\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws dialogue_array ws "," ws "\"tts\"" ws ":" ws tts_obj ws "," ws "\"prompt\"" ws ":" ws string ws "}"
+p3 ::= "{" ws "\"panel\"" ws ":" ws "3" ws "," ws "\"summary\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws dialogue_array ws "," ws "\"tts\"" ws ":" ws tts_obj ws "," ws "\"prompt\"" ws ":" ws string ws "}"
 p4 ::= "{" ws "\"panel\"" ws ":" ws "4" ws "," ws "\"summary\"" ws ":" ws string ws "," ws "\"prompt\"" ws ":" ws string ws "}"
+
+dialogue_array ::= "[" ws dialogue_item ws dialogue_tail ws "]"
+dialogue_tail ::= "" | ws "," ws dialogue_item ws dialogue_tail
+
+dialogue_item ::= "{" ws "\"character\"" ws ":" ws string ws "," ws "\"text\"" ws ":" ws string ws "}"
+
+tts_obj ::= "{" ws "\"before_dialogue\"" ws ":" ws string ws "," ws "\"after_dialogue\"" ws ":" ws string ws "}"
 
 string ::= "\"" schars "\""
 schars ::= "" | schar schars
@@ -14,11 +21,6 @@ schar ::= sunesc | sesc
 sunesc ::= [^"\\]
 sesc ::= "\\" escch
 escch ::= ["\\/bfnrt]
-
-number ::= "0" | nonzero digitsopt
-nonzero ::= [1-9]
-digitsopt ::= "" | digit digitsopt
-digit ::= [0-9]
 
 ws ::= "" | wsch ws
 wsch ::= " " | "\t" | "\n" | "\r"

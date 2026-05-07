@@ -167,7 +167,12 @@ public:
     // for debugging
     std::string str() const;
 
-    llama_pos pos_next() const;
+    // the next position after n_tokens. if n_tokens < 0, return the next position after all tokens.
+    llama_pos pos_next(int64_t n_tokens = -1) const;
+
+    // number of tokens with position <= max_pos
+    size_t size_up_to_pos(llama_pos max_pos) const;
+
     const mtmd::input_chunk_ptr & find_chunk(size_t idx) const;
 
     void push_back(llama_token tok);
@@ -294,6 +299,9 @@ json oaicompat_chat_params_parse(
     const server_chat_params & opt,
     std::vector<raw_buffer> & out_files);
 
+// convert OpenAI Responses API format to OpenAI Chat Completions API format
+json convert_responses_to_chatcmpl(const json & body);
+
 // convert Anthropic Messages API format to OpenAI Chat Completions API format
 json convert_anthropic_to_oai(const json & body);
 
@@ -330,6 +338,8 @@ std::string tokens_to_output_formatted_string(const llama_context * ctx, const l
 // format server-sent event (SSE), return the formatted string to send
 // note: if data is a json array, it will be sent as multiple events, one per item
 std::string format_oai_sse(const json & data);
+
+std::string format_oai_resp_sse(const json & data);
 
 // format Anthropic-style SSE with event types
 std::string format_anthropic_sse(const json & data);

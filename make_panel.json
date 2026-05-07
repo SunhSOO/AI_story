@@ -281,7 +281,7 @@
         "Node name for S&R": "CLIPTextEncode"
       },
       "widgets_values": [
-        "text, letters, words, writing, typography, watermark, logo, signature, title, caption, subtitle, label, speech bubble, photorealistic, 3D, crowd, blurry"
+        "low quality, blurry, bad anatomy, extra fingers, extra limbs, distored face, text, watermark"
       ]
     }
   ],

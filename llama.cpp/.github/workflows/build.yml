@@ -21,7 +21,8 @@ on:
       '**/*.m',
       '**/*.metal',
       '**/*.comp',
-      '**/*.glsl'
+      '**/*.glsl',
+      '**/*.wgsl'
     ]
 
   pull_request:
@@ -42,7 +43,8 @@ on:
       '**/*.m',
       '**/*.metal',
       '**/*.comp',
-      '**/*.glsl'
+      '**/*.glsl',
+      '**/*.wgsl'
     ]
 
 concurrency:
@@ -63,7 +65,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -91,7 +93,7 @@ jobs:
         id: cmake_test
         run: |
           cd build
-          ctest -L main --verbose --timeout 900
+          ctest -L main -E "test-llama-archs" --verbose --timeout 900
 
   macOS-latest-cmake-x64:
     runs-on: macos-15-intel
@@ -99,7 +101,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -135,7 +137,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -189,7 +191,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -269,7 +271,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -291,7 +293,9 @@ jobs:
           cmake -B build \
             -DLLAMA_FATAL_WARNINGS=ON \
             -DLLAMA_SANITIZE_${{ matrix.sanitizer }}=ON \
+            -DGGML_SANITIZE_${{ matrix.sanitizer }}=ON \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
           cmake --build build --config ${{ matrix.build_type }} -j $(nproc)
 
       - name: Build (no OpenMP)
@@ -301,8 +305,10 @@ jobs:
           cmake -B build \
             -DLLAMA_FATAL_WARNINGS=ON \
             -DLLAMA_SANITIZE_${{ matrix.sanitizer }}=ON \
+            -DGGML_SANITIZE_${{ matrix.sanitizer }}=ON \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DGGML_OPENMP=OFF
+
           cmake --build build --config ${{ matrix.build_type }} -j $(nproc)
 
       - name: Test
@@ -317,7 +323,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Dependencies
         id: depends
@@ -347,7 +353,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # - name: ccache
       #   uses: ggml-org/ccache-action@v1.2.16
@@ -380,7 +386,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -414,7 +420,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -436,7 +442,7 @@ jobs:
           echo "VULKAN_SDK_VERSION=$(curl https://vulkan.lunarg.com/sdk/latest/linux.txt)" >> "$GITHUB_ENV"
 
       - name: Use Vulkan SDK Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-sdk
         with:
           path: ./vulkan_sdk
@@ -464,7 +470,7 @@ jobs:
           export GGML_VK_VISIBLE_DEVICES=0
           export GGML_VK_DISABLE_F16=1
           # This is using llvmpipe and runs slower than other backends
-          ctest -L main --verbose --timeout 4200
+          ctest -L main --verbose --timeout 4800
 
   ubuntu-24-cmake-webgpu:
     runs-on: ubuntu-24.04
@@ -472,7 +478,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -494,7 +500,7 @@ jobs:
           echo "VULKAN_SDK_VERSION=$(curl https://vulkan.lunarg.com/sdk/latest/linux.txt)" >> "$GITHUB_ENV"
 
       - name: Use Vulkan SDK Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-sdk
         with:
           path: ./vulkan_sdk
@@ -543,7 +549,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -585,7 +591,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Dependencies
         id: depends
@@ -616,7 +622,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Dependencies
         id: depends
@@ -644,7 +650,7 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: add oneAPI to apt
         shell: bash
@@ -668,7 +674,7 @@ jobs:
 
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -693,7 +699,7 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: add oneAPI to apt
         shell: bash
@@ -717,7 +723,7 @@ jobs:
 
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -749,7 +755,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -781,7 +787,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -813,7 +819,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build
         id: cmake_build
@@ -843,7 +849,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -853,7 +859,7 @@ jobs:
           save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
       - name: Download xcframework artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: llama-xcframework
           path: build-apple/llama.xcframework/
@@ -885,7 +891,7 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -954,7 +960,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -1053,7 +1059,7 @@ jobs:
     steps:
         - name: Clone
           id: checkout
-          uses: actions/checkout@v4
+          uses: actions/checkout@v6
 
         - name: Install dependencies
           env:
@@ -1092,7 +1098,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -1145,7 +1151,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -1169,25 +1175,23 @@ jobs:
     runs-on: windows-2022
 
     env:
-      # The ROCm version must correspond to the version used in the HIP SDK.
-      ROCM_VERSION: "6.4.2"
       # Make sure this is in sync with build-cache.yml
-      HIPSDK_INSTALLER_VERSION: "25.Q3"
+      HIPSDK_INSTALLER_VERSION: "26.Q1"
 
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Grab rocWMMA package
         id: grab_rocwmma
         run: |
-          curl -o rocwmma.deb "https://repo.radeon.com/rocm/apt/${{ env.ROCM_VERSION }}/pool/main/r/rocwmma-dev/rocwmma-dev_1.7.0.60402-120~24.04_amd64.deb"
+          curl -o rocwmma.deb "https://repo.radeon.com/rocm/apt/7.2/pool/main/r/rocwmma-dev/rocwmma-dev_2.2.0.70200-43~24.04_amd64.deb"
           7z x rocwmma.deb
           7z x data.tar
 
       - name: Use ROCm Installation Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-rocm
         with:
           path: C:\Program Files\AMD\ROCm
@@ -1225,7 +1229,7 @@ jobs:
           cmake -G "Unix Makefiles" -B build -S . `
             -DCMAKE_C_COMPILER="${env:HIP_PATH}\bin\clang.exe" `
             -DCMAKE_CXX_COMPILER="${env:HIP_PATH}\bin\clang++.exe" `
-            -DCMAKE_CXX_FLAGS="-I$($PWD.Path.Replace('\', '/'))/opt/rocm-${{ env.ROCM_VERSION }}/include/" `
+            -DCMAKE_CXX_FLAGS="-I$($PWD.Path.Replace('\', '/'))/opt/rocm-7.2.0/include/" `
             -DCMAKE_BUILD_TYPE=Release `
             -DLLAMA_BUILD_BORINGSSL=ON `
             -DROCM_DIR="${env:HIP_PATH}" `
@@ -1239,7 +1243,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -1269,7 +1273,7 @@ jobs:
           ./build-xcframework.sh
 
       - name: Upload xcframework artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: llama-xcframework
           path: build-apple/llama.xcframework/
@@ -1285,7 +1289,7 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Disabled due to size (400MB) and always 0 cache hits
       # - name: ccache
@@ -1295,7 +1299,7 @@ jobs:
       #     evict-old-files: 1d
 
       - name: Set up JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v5
         with:
           java-version: 17
           distribution: zulu
@@ -1327,7 +1331,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install OpenCL Headers and Libs
         id: install_opencl
@@ -1371,7 +1375,7 @@ jobs:
         id: update_presets
         if: ${{ matrix.build == 'arm64-snapdragon' }}
         run: |
-          cp docs/backend/hexagon/CMakeUserPresets.json .
+          cp docs/backend/snapdragon/CMakeUserPresets.json .
 
       - name: Build
         id: ndk_build
@@ -1402,7 +1406,7 @@ jobs:
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -1460,7 +1464,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -1486,7 +1490,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -1512,7 +1516,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -1530,7 +1534,7 @@ jobs:
       - name: Test
         id: ggml-ci
         run: |
-          LLAMA_ARG_THREADS=$(nproc) bash ./ci/run.sh ./tmp/results ./tmp/mnt
+          LLAMA_ARG_THREADS=$(nproc) GG_BUILD_HIGH_PERF=1 bash ./ci/run.sh ./tmp/results ./tmp/mnt
 
   ggml-ci-arm64-cpu-high-perf:
     runs-on: ubuntu-22.04-arm
@@ -1538,7 +1542,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -1556,7 +1560,7 @@ jobs:
       - name: Test
         id: ggml-ci
         run: |
-          LLAMA_ARG_THREADS=$(nproc) GG_BUILD_NO_SVE=1 GG_BUILD_NO_BF16=1 GG_BUILD_EXTRA_TESTS_0=1 bash ./ci/run.sh ./tmp/results ./tmp/mnt
+          LLAMA_ARG_THREADS=$(nproc) GG_BUILD_HIGH_PERF=1 GG_BUILD_NO_SVE=1 GG_BUILD_NO_BF16=1 GG_BUILD_EXTRA_TESTS_0=1 bash ./ci/run.sh ./tmp/results ./tmp/mnt
 
   ggml-ci-arm64-cpu-high-perf-sve:
     runs-on: ubuntu-22.04-arm
@@ -1564,7 +1568,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.16
@@ -1590,7 +1594,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Test
         id: ggml-ci
@@ -1604,7 +1608,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Test
         id: ggml-ci
@@ -1618,7 +1622,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Test
         id: ggml-ci
@@ -1632,7 +1636,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Test
         id: ggml-ci
@@ -1645,7 +1649,7 @@ jobs:
   #   steps:
   #     - name: Clone
   #       id: checkout
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@v6
 
   #     - name: Test
   #       id: ggml-ci
@@ -1659,7 +1663,7 @@ jobs:
   #   steps:
   #     - name: Clone
   #       id: checkout
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@v6
 
   #     - name: Test
   #       id: ggml-ci
@@ -1673,7 +1677,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Test
         id: ggml-ci
@@ -1686,7 +1690,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Dawn Dependency
         id: dawn-depends
@@ -1714,7 +1718,7 @@ jobs:
     steps:
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Test
         id: ggml-ci
@@ -1728,7 +1732,7 @@ jobs:
      steps:
        - name: Clone
          id: checkout
-         uses: actions/checkout@v4
+         uses: actions/checkout@v6
 
        - name: ccache
          uses: ggml-org/ccache-action@v1.2.16
@@ -1773,7 +1777,7 @@ jobs:
 
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check environment
         run: |
@@ -1875,7 +1879,7 @@ jobs:
 
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup ccache
         run: |
@@ -1969,7 +1973,7 @@ jobs:
 
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup ccache
         run: |
@@ -2043,7 +2047,7 @@ jobs:
 
       - name: Clone
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup ccache
         run: |
@@ -2089,7 +2093,7 @@ jobs:
      steps:
        - name: Clone
          id: checkout
-         uses: actions/checkout@v4
+         uses: actions/checkout@v6
 
        - name: Dependencies
          id: depends

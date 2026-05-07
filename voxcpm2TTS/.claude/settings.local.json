@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ffmpeg -i \"c:/Users/sunhy/Desktop/voxcpm2TTS/test.mp4\" -vn -acodec pcm_s16le -ar 44100 -ac 2 \"c:/Users/sunhy/Desktop/voxcpm2TTS/test.wav\")",
+      "Bash(python -c \"import moviepy\")",
+      "Bash(pip install *)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import gradio\")"
+    ]
+  }
+}

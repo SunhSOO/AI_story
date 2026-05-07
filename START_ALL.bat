@@ -17,7 +17,7 @@ timeout /t 2 /nobreak >nul
 
 REM 2. FastAPI 서버 실행 (가상환경 활성화)
 echo 2. FastAPI server running(including virtual environment)...
-start "FastAPI Server" cmd /k "cd /d %PROJECT_DIR% && venv\Scripts\activate.bat && uvicorn server:app --host 127.0.0.1 --port 8000 --reload"
+start "FastAPI Server" cmd /k "cd /d %PROJECT_DIR% && venv\Scripts\activate.bat && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 REM 3초 대기
 timeout /t 3 /nobreak >nul

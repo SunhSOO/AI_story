@@ -1,0 +1,4 @@
+voxcpm
+soundfile
+numpy
+torch>=2.5.0

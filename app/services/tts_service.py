@@ -1,0 +1,51 @@
+"""TTS generation service using voxcpm2 with emotion support."""
+from pathlib import Path
+
+from app.clients.voxcpm2_client import synthesize, synthesize_narration_dialogue
+from app.core.exceptions import TTSError
+from app.schemas.story_schema import SceneSchema
+
+
+def _scene_audio_path(run_dir: Path, scene_no: int) -> Path:
+    return run_dir / "audio" / f"scene_{scene_no:02d}.wav"
+
+
+def generate_scene_audio(scene: SceneSchema, run_dir: Path) -> str:
+    """Synthesize audio for a single scene and save to run_dir/audio/.
+
+    - If dialogue exists: narration (narration_emotion) + 0.5 s silence + dialogue (dialogue_emotion)
+    - Otherwise: narration only (narration_emotion)
+
+    Returns filename relative to run_dir/audio/.
+    """
+    output_path = _scene_audio_path(run_dir, scene.scene_no)
+
+    if scene.dialogue:
+        synthesize_narration_dialogue(
+            narration=scene.narration,
+            dialogue=scene.dialogue,
+            narration_emotion=scene.narration_emotion,
+            dialogue_emotion=scene.dialogue_emotion,
+            output_path=output_path,
+        )
+    else:
+        synthesize(text=scene.narration, emotion=scene.narration_emotion, output_path=output_path)
+
+    print(f"[TTS] scene {scene.scene_no} (narration={scene.narration_emotion}, dialogue={scene.dialogue_emotion}) → {output_path.name}")
+    return output_path.name
+
+
+def generate_all_audio(scenes: list[SceneSchema], run_dir: Path) -> dict[int, str]:
+    """Generate audio for all scenes.
+
+    Returns:
+        {scene_no: filename} mapping.
+    """
+    result: dict[int, str] = {}
+    for scene in scenes:
+        try:
+            filename = generate_scene_audio(scene, run_dir)
+            result[scene.scene_no] = filename
+        except Exception as e:
+            raise TTSError(f"TTS failed for scene {scene.scene_no}: {e}") from e
+    return result
