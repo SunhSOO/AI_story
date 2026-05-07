@@ -34,7 +34,8 @@ class ComfyUIClient:
         return history.get(prompt_id)
 
     def wait_for_completion(self, prompt_id: str, timeout: int | None = None) -> dict:
-        deadline = time.time() + (timeout or settings.image_gen_timeout)
+        effective_timeout = timeout or settings.image_gen_timeout
+        deadline = time.time() + effective_timeout
         while time.time() < deadline:
             h = self.get_history(prompt_id)
             if h is not None:
@@ -42,7 +43,7 @@ class ComfyUIClient:
                 if status.get("completed") or status.get("status_str") == "error":
                     return h
             time.sleep(2)
-        raise ImageGenError(f"ComfyUI prompt {prompt_id} timed out after {timeout}s")
+        raise ImageGenError(f"ComfyUI prompt {prompt_id} timed out after {effective_timeout}s")
 
     def download_image(self, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes:
         r = requests.get(

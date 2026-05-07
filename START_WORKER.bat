@@ -16,7 +16,7 @@ timeout /t 3 /nobreak >nul
 
 REM 2. Worker API 서버 실행 (포트 8001)
 echo 2. Worker API server running on port 8001...
-start "Worker-API" cmd /k "cd /d %PROJECT_DIR% && venv\Scripts\activate.bat && uvicorn app.workers.worker_server:app --host 0.0.0.0 --port 8001"
+start "Worker-API" cmd /k "cd /d %PROJECT_DIR% && venv\Scripts\activate.bat && python -m uvicorn app.workers.worker_server:app --host 0.0.0.0 --port 8001"
 
 echo.
 echo === Worker 서버가 시작되었습니다! ===

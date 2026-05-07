@@ -16,6 +16,7 @@ class RunState:
         self.stage = RunStage.LLM
         self.story_title: str = ""
         self.cover_image_url: str = ""
+        self.cover_audio_url: str = ""
         self.scenes: list[SceneInfo] = []
         self.error: Optional[str] = None
         self.created_at = datetime.now()
@@ -27,6 +28,7 @@ class RunState:
             stage=self.stage,
             story_title=self.story_title,
             cover_image_url=self.cover_image_url,
+            cover_audio_url=self.cover_audio_url,
             scenes=self.scenes,
             error=self.error,
         )
@@ -36,6 +38,9 @@ class RunState:
 
     def set_cover_image(self, filename: str) -> None:
         self.cover_image_url = f"/api/runs/{self.run_id}/images/{filename}"
+
+    def set_cover_audio(self, filename: str) -> None:
+        self.cover_audio_url = f"/api/runs/{self.run_id}/audio/{filename}"
 
     def init_scenes(self, scene_count: int) -> None:
         self.scenes = [SceneInfo(scene_no=i) for i in range(1, scene_count + 1)]

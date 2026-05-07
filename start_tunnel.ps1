@@ -2,7 +2,7 @@ while ($true) {
     Write-Host "Starting localtunnel..."
     try {
         # mystorybook 서브도메인 사용 (실패 시 랜덤 URL 할당될 수 있음)
-        npx localtunnel --port 8000 --subdomain mystorybook
+        npx.cmd localtunnel --port 8000 --subdomain mystorybook
     }
     catch {
         Write-Host "Localtunnel process crashed. Restarting in 3 seconds..."

@@ -5,6 +5,8 @@ from app.schemas.story_schema import StorySchema
 
 _LLM_TIMEOUT = aiohttp.ClientTimeout(total=900)
 _IMG_TIMEOUT = aiohttp.ClientTimeout(total=300)
+_TTS_TIMEOUT = aiohttp.ClientTimeout(total=120)
+_CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=30)
 
 
 class WorkerClient:
@@ -36,3 +38,33 @@ class WorkerClient:
             ) as resp:
                 resp.raise_for_status()
                 return await resp.read()
+
+    async def generate_tts(
+        self,
+        scene_no: int,
+        narration: str,
+        dialogue: str,
+        narration_emotion: str,
+        dialogue_emotion: str,
+    ) -> bytes:
+        async with aiohttp.ClientSession(timeout=_TTS_TIMEOUT) as session:
+            async with session.post(
+                f"{self.base_url}/tts/generate",
+                json={
+                    "scene_no": scene_no,
+                    "narration": narration,
+                    "dialogue": dialogue,
+                    "narration_emotion": narration_emotion,
+                    "dialogue_emotion": dialogue_emotion,
+                },
+            ) as resp:
+                resp.raise_for_status()
+                return await resp.read()
+
+    async def cleanup(self) -> None:
+        try:
+            async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:
+                async with session.post(f"{self.base_url}/cleanup") as resp:
+                    resp.raise_for_status()
+        except Exception as e:
+            print(f"[WORKER CLEANUP] {e}")

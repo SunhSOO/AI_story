@@ -4,6 +4,8 @@ import asyncio
 import traceback
 import time
 
+from app.frontend_management import FrontendManager, parse_version
+
 import nodes
 import folder_paths
 import execution
@@ -31,7 +33,6 @@ import comfy.model_management
 from comfy_api import feature_flags
 import node_helpers
 from comfyui_version import __version__
-from app.frontend_management import FrontendManager, parse_version
 from comfy_api.internal import _ComfyNodeInternal
 from app.assets.scanner import seed_assets
 from app.assets.api.routes import register_assets_system

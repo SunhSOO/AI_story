@@ -10,6 +10,14 @@ def _scene_audio_path(run_dir: Path, scene_no: int) -> Path:
     return run_dir / "audio" / f"scene_{scene_no:02d}.wav"
 
 
+def generate_cover_audio(title: str, run_dir: Path) -> str:
+    """Synthesize cover audio (title) and save to run_dir/audio/cover.wav."""
+    output_path = run_dir / "audio" / "cover.wav"
+    synthesize(text=title, emotion=None, output_path=output_path)
+    print(f"[TTS] cover → {output_path.name}")
+    return output_path.name
+
+
 def generate_scene_audio(scene: SceneSchema, run_dir: Path) -> str:
     """Synthesize audio for a single scene and save to run_dir/audio/.
 
