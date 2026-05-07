@@ -65,6 +65,13 @@ async def tts_unload():
     return {"status": "ok"}
 
 
+@app.post("/comfyui/free")
+async def comfyui_free():
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _free_comfyui)
+    return {"status": "ok"}
+
+
 @app.post("/cleanup")
 async def cleanup():
     loop = asyncio.get_event_loop()
@@ -108,6 +115,20 @@ def _generate_tts_bytes(req: TTSRequest) -> bytes:
             synthesize(text=req.narration, emotion=req.narration_emotion, output_path=output_path)
 
         return output_path.read_bytes()
+
+
+def _free_comfyui() -> None:
+    try:
+        import gc
+        from app.clients.comfyui_client import ComfyUIClient
+        ComfyUIClient().free_memory()
+        gc.collect()
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print("[WORKER] ComfyUI VRAM freed")
+    except Exception as e:
+        print(f"[WORKER] ComfyUI free: {e}")
 
 
 def _unload_tts() -> None:

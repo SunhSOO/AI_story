@@ -61,6 +61,14 @@ class WorkerClient:
                 resp.raise_for_status()
                 return await resp.read()
 
+    async def free_comfyui(self) -> None:
+        try:
+            async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:
+                async with session.post(f"{self.base_url}/comfyui/free") as resp:
+                    resp.raise_for_status()
+        except Exception as e:
+            print(f"[WORKER COMFYUI FREE] {e}")
+
     async def unload_tts(self) -> None:
         try:
             async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:

@@ -178,6 +178,10 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                     print(f"[WORKER] scene {scene_no} img {idx} done")
                 await _emit(run_state, {"scene_no": scene_no})
 
+            # 워커 ComfyUI VRAM 해제
+            await worker.free_comfyui()
+            print("[WORKER] ComfyUI VRAM freed")
+
         # Branch B (3080 Master): 표지 TTS + Scene 3,4 TTS → 로컬 ComfyUI 이미지
         async def _local_branch():
             run_state.stage = RunStage.TTS
@@ -227,6 +231,16 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 await _emit(run_state, {"scene_no": scene_no})
 
             await loop.run_in_executor(None, local_client.free_memory)
+
+            # CUDA 캐시까지 명시적으로 반환
+            def _local_cuda_cleanup():
+                import gc, torch
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                print("[LOCAL] ComfyUI VRAM freed")
+
+            await loop.run_in_executor(None, _local_cuda_cleanup)
 
         await asyncio.gather(_worker_branch(), _local_branch())
 
