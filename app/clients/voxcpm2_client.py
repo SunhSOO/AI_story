@@ -31,12 +31,13 @@ def get_tts_executor() -> concurrent.futures.ThreadPoolExecutor:
 
 def unload_model() -> None:
     """TTS executor를 종료하고 VRAM에서 voxcpm2 모델을 해제."""
+    import gc
     global _tts_executor
 
-    # executor 종료 — 스레드 참조 해제
+    # executor 종료 — wait=True로 스레드가 완전히 종료될 때까지 대기
     with _tts_executor_lock:
         if _tts_executor is not None:
-            _tts_executor.shutdown(wait=False, cancel_futures=True)
+            _tts_executor.shutdown(wait=True)
             _tts_executor = None
 
     # model_loader 싱글톤(_model) 해제
@@ -48,6 +49,16 @@ def unload_model() -> None:
             print("[TTS] voxcpm2 model unloaded from VRAM")
     except Exception as e:
         print(f"[TTS] model unload: {e}")
+
+    # CUDA 메모리 강제 반환 — del만으로는 allocator 캐시가 남음
+    try:
+        gc.collect()
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print("[TTS] CUDA cache cleared")
+    except Exception as e:
+        print(f"[TTS] CUDA cleanup: {e}")
 
 
 def _patch_tqdm() -> None:
