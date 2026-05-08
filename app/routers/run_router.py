@@ -33,6 +33,9 @@ async def create_run(request: CreateRunRequest, background_tasks: BackgroundTask
 async def get_run(run_id: str):
     state = run_registry.get(run_id)
     if not state:
+        restored = storage_service.load_run_response(run_id)
+        if restored:
+            return restored
         raise HTTPException(404, f"Run {run_id} not found")
     return state.to_response()
 
@@ -41,7 +44,14 @@ async def get_run(run_id: str):
 async def run_events(run_id: str):
     state = run_registry.get(run_id)
     if not state:
-        raise HTTPException(404, f"Run {run_id} not found")
+        restored = storage_service.load_run_response(run_id)
+        if not restored:
+            raise HTTPException(404, f"Run {run_id} not found")
+
+        async def restored_generator():
+            yield {"event": "update", "data": restored.model_dump_json()}
+
+        return EventSourceResponse(restored_generator())
 
     from app.services.event_service import event_bus
 
@@ -58,7 +68,7 @@ async def run_events(run_id: str):
 @router.get("/{run_id}/story")
 async def get_story(run_id: str):
     state = run_registry.get(run_id)
-    if not state:
+    if not state and not storage_service.load_run_response(run_id):
         raise HTTPException(404, f"Run {run_id} not found")
     story_path = storage_service.get_run_dir(run_id) / "story.json"
     if not story_path.exists():

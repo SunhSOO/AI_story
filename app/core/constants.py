@@ -1,18 +1,23 @@
 """Project-wide constants."""
 
 ALLOWED_EMOTIONS = frozenset(
-    {"happy", "sad", "curious", "surprised", "tense", "calm", "warm", "magical"}
+    {
+        "행복",
+        "슬픔",
+        "화남",
+        "밝음",
+        "긴장",
+        "무서움",
+    }
 )
 
 EMOTION_STYLE_MAP = {
-    "happy": "joyful, bright, warm, smiling voice, upbeat",
-    "sad": "sorrowful, melancholy, tearful, heavy voice",
-    "curious": "inquisitive, wondering, playful, light voice",
-    "surprised": "astonished, wide-eyed, breathless",
-    "tense": "intense, urgent, slightly trembling",
-    "calm": "slow, calm, peaceful, gentle, relaxed, steady",
-    "warm": "gentle, caring, tender, soft voice",
-    "magical": "dreamy, mystical, ethereal, enchanting",
+    "행복": "cheerful tone",
+    "슬픔": "sad emotional voice",
+    "화남": "angry aggressive tone",
+    "밝음": "bright energetic tone",
+    "긴장": "nervous hesitant voice",
+    "무서움": "fearful trembling voice",
 }
 
 IMAGE_STYLE_PREFIX = (

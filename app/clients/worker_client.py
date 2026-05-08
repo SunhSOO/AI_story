@@ -61,6 +61,15 @@ class WorkerClient:
                 resp.raise_for_status()
                 return await resp.read()
 
+    async def generate_cover_tts(self, title: str) -> bytes:
+        return await self.generate_tts(
+            scene_no=0,
+            narration=title,
+            dialogue="",
+            narration_emotion="",
+            dialogue_emotion="",
+        )
+
     async def free_comfyui(self) -> None:
         try:
             async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:

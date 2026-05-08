@@ -544,14 +544,12 @@ audio {
   font-weight: 800;
 }
 
-.emotion-badge[data-emotion="happy"] { background: #fff3c4; color: #7a4c00; }
-.emotion-badge[data-emotion="sad"] { background: #deebff; color: #174ea6; }
-.emotion-badge[data-emotion="curious"] { background: #e9ddff; color: #5b2aa0; }
-.emotion-badge[data-emotion="surprised"] { background: #ffe1cc; color: #974313; }
-.emotion-badge[data-emotion="tense"] { background: #ffe1df; color: #a13228; }
-.emotion-badge[data-emotion="calm"] { background: #d9f2e3; color: #126239; }
-.emotion-badge[data-emotion="warm"] { background: #ffe3ef; color: #9b1b55; }
-.emotion-badge[data-emotion="magical"] { background: #dff3ff; color: #095c73; }
+.emotion-badge[data-emotion="행복"] { background: #fff3c4; color: #7a4c00; }
+.emotion-badge[data-emotion="슬픔"] { background: #deebff; color: #174ea6; }
+.emotion-badge[data-emotion="화남"] { background: #ffe1df; color: #a13228; }
+.emotion-badge[data-emotion="밝음"] { background: #fff3c4; color: #7a4c00; }
+.emotion-badge[data-emotion="긴장"] { background: #ffe1cc; color: #974313; }
+.emotion-badge[data-emotion="무서움"] { background: #e9ddff; color: #5b2aa0; }
 
 .panel-grid {
   display: grid;

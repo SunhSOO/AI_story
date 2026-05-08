@@ -16,14 +16,12 @@ const STAGE_LABELS = {
   PARALLEL: '음성/이미지 병렬 생성',
 };
 const EMOTION_LABELS = {
-  happy: '기쁨',
-  sad: '슬픔',
-  curious: '호기심',
-  surprised: '놀람',
-  tense: '긴장',
-  calm: '차분함',
-  warm: '따뜻함',
-  magical: '신비로움',
+  행복: '행복',
+  슬픔: '슬픔',
+  화남: '화남',
+  밝음: '밝음',
+  긴장: '긴장',
+  무서움: '무서움',
 };
 
 const state = {
@@ -31,6 +29,7 @@ const state = {
   eventSource: null,
   pollTimer: null,
   pollInFlight: false,
+  pollFailures: 0,
   mediaRecorder: null,
   audioChunks: [],
   activeStream: null,
@@ -157,6 +156,7 @@ function startMonitoring() {
     state.eventSource.addEventListener('update', (event) => {
       const message = parseJSON(event.data);
       if (message) addEventLog(eventLabel(message));
+      applyEventHint(message);
       refreshRun();
 
       if (message?.status === 'DONE' || message?.status === 'FAILED') {
@@ -196,6 +196,7 @@ async function refreshRun() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data = await response.json();
+    state.pollFailures = 0;
     renderRun(data);
 
     if (data.status === 'DONE' || data.status === 'FAILED') {
@@ -203,7 +204,8 @@ async function refreshRun() {
       setFormBusy(false);
     }
   } catch (error) {
-    setConnection('상태 확인 실패', 'error');
+    state.pollFailures += 1;
+    setConnection(state.pollFailures >= 3 ? '상태 확인 실패' : '상태 재시도', state.pollFailures >= 3 ? 'error' : 'live');
   } finally {
     state.pollInFlight = false;
   }
@@ -535,9 +537,56 @@ function eventLabel(message) {
   if (message.status === 'DONE') return '작업 완료';
   if (message.cover_image) return '표지 이미지 도착';
   if (message.cover_audio) return '표지 음성 도착';
+  if (message.image && message.scene_no) return `장면 ${message.scene_no} 이미지 도착`;
   if (message.audio && message.scene_no) return `장면 ${message.scene_no} 음성 도착`;
   if (message.scene_no) return `장면 ${message.scene_no} 갱신`;
   return STAGE_LABELS[message.stage] || '상태 갱신';
+}
+
+function applyEventHint(message) {
+  if (!message || !state.runId) return;
+
+  const coverImageUrl = message.cover_image_url || imageUrlFromMessage(message.cover_image);
+  if (coverImageUrl) {
+    document.getElementById('cover-heading').textContent = '표지 준비 완료';
+    updateImageSlot('cover-image-slot', 'cover-image', coverImageUrl, '표지 이미지 대기');
+  }
+
+  const coverAudioUrl = message.cover_audio_url || audioUrlFromMessage(message.cover_audio);
+  if (coverAudioUrl) {
+    updateAudio('cover-audio-shell', 'cover-audio', 'cover-audio-status', coverAudioUrl);
+  }
+
+  if (!message.scene_no) return;
+
+  const sceneNo = Number(message.scene_no);
+  const sceneImageUrl = message.image_url || imageUrlFromMessage(message.image);
+  if (sceneImageUrl) {
+    const panel = parsePanelIndex(sceneImageUrl) || 1;
+    updateImageSlot(
+      `panel-slot-${sceneNo}-${panel}`,
+      `panel-image-${sceneNo}-${panel}`,
+      sceneImageUrl,
+      `패널 ${panel} 대기`,
+    );
+  }
+
+  const sceneAudioUrl = message.audio_url || audioUrlFromMessage(message.audio);
+  if (sceneAudioUrl) {
+    updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, sceneAudioUrl);
+  }
+}
+
+function imageUrlFromMessage(filename) {
+  if (!filename) return '';
+  if (filename.startsWith('http') || filename.startsWith('/api/')) return filename;
+  return `/api/runs/${state.runId}/images/${filename}`;
+}
+
+function audioUrlFromMessage(filename) {
+  if (!filename) return '';
+  if (filename.startsWith('http') || filename.startsWith('/api/')) return filename;
+  return `/api/runs/${state.runId}/audio/${filename}`;
 }
 
 function resetAll() {

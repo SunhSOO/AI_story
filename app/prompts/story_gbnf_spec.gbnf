@@ -9,7 +9,7 @@ scene4 ::= "{" ws "\"scene_no\"" ws ":" ws "4" ws "," ws "\"title\"" ws ":" ws s
 
 prompts3 ::= "[" ws string ws "," ws string ws "," ws string ws "]"
 
-emotion ::= "\"happy\"" | "\"sad\"" | "\"curious\"" | "\"surprised\"" | "\"tense\"" | "\"calm\"" | "\"warm\"" | "\"magical\""
+emotion ::= "\"행복\"" | "\"슬픔\"" | "\"화남\"" | "\"밝음\"" | "\"긴장\"" | "\"무서움\""
 
 string ::= "\"" schars "\""
 schars ::= "" | schar schars
