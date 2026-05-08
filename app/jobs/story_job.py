@@ -1,7 +1,9 @@
-"""Main pipeline job: worker LLM/TTS plus split image generation, with SSE events."""
+"""Main pipeline job: LLM(5080) → [5080 images ‖ 3080 TTS + 3080 images], with SSE events."""
 import asyncio
 import gc
 import random
+import subprocess
+import sys
 import time
 
 from app.core.config import settings
@@ -13,14 +15,16 @@ from app.services.run_service import RunRegistry, RunState
 # ── 이미지 분배 정의 ──────────────────────────────────────────────────────────
 # {scene_no: [img_idx, ...]}  img_idx는 1-based
 _WORKER_IMAGES: dict[int, list[int]] = {
-    1: [1, 2, 3],   # 5080: scene1 전체
-    2: [1, 2, 3],
-    3: [3],   # 5080: scene2 전체
-    4: [2,3],   # 5080: scene3 
+    1: [3],   
+    2: [1, 3],
+    3: [2],  
+    4: [1,3],   
 }
 _LOCAL_IMAGES: dict[int, list[int]] = {
-    3: [1, 2],
-    4: [1]   # 3080: scene4 전체
+    1: [1,2],
+    2: [2],
+    3: [1, 3],
+    4: [2]  
 }
 
 
@@ -56,6 +60,12 @@ async def _cleanup_system(reason: str, worker=None) -> None:
     except Exception as e:
         print(f"[CLEANUP] ComfyUI: {e}")
 
+    try:
+        from app.clients.voxcpm2_client import unload_model
+        await loop.run_in_executor(None, unload_model)
+    except Exception as e:
+        print(f"[CLEANUP] voxcpm2: {e}")
+
     # 워커 GPU 메모리도 해제
     if worker is not None:
         await worker.cleanup()
@@ -73,8 +83,8 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
     """Dual-machine pipeline:
       Stage 1: LLM on 5080 worker
       Stage 2 (parallel):
-        Branch A (worker): cover TTS, all scene TTS, cover image, assigned scene images
-        Branch B (local): assigned scene images only
+        Branch A (5080): Scene1,2 TTS → cover + scene1(1,2,3) + scene3(1,3) + scene4(1,3)
+        Branch B (3080): cover TTS + Scene3,4 TTS → scene2(1,2,3) + scene3(2) + scene4(2)
     """
     from app.clients.worker_client import WorkerClient
     worker: WorkerClient | None = None
@@ -119,26 +129,11 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
         base_seed = random.randint(0, 9_999_999)
 
-        # Branch A (5080 Worker): all TTS plus assigned images
+        # Branch A (5080 Worker): Scene 1,2 TTS → 표지+씬 이미지
         async def _worker_branch():
-            print("[WORKER] TTS cover on 5080...")
-            cover_audio_bytes = await worker.generate_cover_tts(story.title)
-            cover_audio = "cover.wav"
-            cover_audio_path = run_dir / "audio" / cover_audio
-            cover_audio_path.parent.mkdir(parents=True, exist_ok=True)
-            cover_audio_path.write_bytes(cover_audio_bytes)
-            run_state.set_cover_audio(cover_audio)
-            await _emit(
-                run_state,
-                {
-                    "cover_audio": cover_audio,
-                    "cover_audio_url": f"/api/runs/{run_state.run_id}/audio/{cover_audio}",
-                },
-            )
-            print("[WORKER] TTS cover done")
-
-            for scene in story.scenes:
-                scene_no = scene.scene_no
+            # Scene 1, 2 TTS
+            for scene_no in [1, 2]:
+                scene = story.scenes[scene_no - 1]
                 print(f"[WORKER] TTS scene {scene_no} on 5080...")
                 wav_bytes = await worker.generate_tts(
                     scene_no=scene_no,
@@ -210,8 +205,51 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
             await worker.free_comfyui()
             print("[WORKER] ComfyUI VRAM freed")
 
-        # Branch B (3080 Master): local ComfyUI images only
+        # Branch B (3080 Master): 표지 TTS + Scene 3,4 TTS → 로컬 ComfyUI 이미지
         async def _local_branch():
+            run_state.stage = RunStage.TTS
+            from app.services.tts_service import generate_cover_audio, generate_scene_audio
+            from app.clients.voxcpm2_client import get_tts_executor, unload_model as unload_tts
+
+            tts_executor = get_tts_executor()
+
+            # 표지 TTS (제목)
+            print("[LOCAL] TTS cover...")
+            cover_audio = await loop.run_in_executor(
+                tts_executor, generate_cover_audio, story.title, run_dir
+            )
+            run_state.set_cover_audio(cover_audio)
+            await _emit(
+                run_state,
+                {
+                    "cover_audio": cover_audio,
+                    "cover_audio_url": f"/api/runs/{run_state.run_id}/audio/{cover_audio}",
+                },
+            )
+
+            # Scene 3, 4 TTS
+            for scene_no in [3, 4]:
+                scene = story.scenes[scene_no - 1]
+                print(f"[LOCAL] TTS scene {scene_no}...")
+                filename = await loop.run_in_executor(
+                    tts_executor, generate_scene_audio, scene, run_dir
+                )
+                run_state.set_scene_audio(scene_no, filename)
+                await _emit(
+                    run_state,
+                    {
+                        "scene_no": scene_no,
+                        "audio": filename,
+                        "audio_url": f"/api/runs/{run_state.run_id}/audio/{filename}",
+                    },
+                )
+
+            # TTS 모델 언로드 → ComfyUI VRAM 확보
+            await loop.run_in_executor(None, unload_tts)
+            print("[LOCAL] TTS done, model unloaded")
+
+            # 3080 로컬 ComfyUI 이미지
+            run_state.stage = RunStage.IMAGE
             from app.services.image_service import generate_scene_image_at
             from app.clients.comfyui_client import ComfyUIClient
 
