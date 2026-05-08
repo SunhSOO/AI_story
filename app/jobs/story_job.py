@@ -13,13 +13,12 @@ from app.services.run_service import RunRegistry, RunState
 # ── 이미지 분배 정의 ──────────────────────────────────────────────────────────
 # {scene_no: [img_idx, ...]}  img_idx는 1-based
 _WORKER_IMAGES: dict[int, list[int]] = {
-    1: [3],   
     2: [1, 3],
     3: [2],  
-    4: [1,3],   
+    4: [1, 3],   
 }
 _LOCAL_IMAGES: dict[int, list[int]] = {
-    1: [1,2],
+    1: [1, 2, 3],
     2: [2],
     3: [1, 3],
     4: [2]  
