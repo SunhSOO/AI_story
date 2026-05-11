@@ -15,14 +15,6 @@ const STAGE_LABELS = {
   IMAGE: '이미지 생성',
   PARALLEL: '음성/이미지 병렬 생성',
 };
-const EMOTION_LABELS = {
-  행복: '행복',
-  슬픔: '슬픔',
-  화남: '화남',
-  밝음: '밝음',
-  긴장: '긴장',
-  무서움: '무서움',
-};
 
 const state = {
   runId: '',
@@ -62,17 +54,12 @@ function buildSceneShells() {
       <header class="scene-header">
         <div>
           <p class="scene-index">장면 ${sceneNo}</p>
-          <h3 id="scene-title-${sceneNo}" class="placeholder-line">이야기 생성 대기</h3>
         </div>
         <span class="resource-pill" id="scene-pill-${sceneNo}">대기</span>
       </header>
       <div class="scene-copy">
         <p id="scene-narration-${sceneNo}" class="placeholder-line">나레이션이 도착하면 표시됩니다.</p>
         <blockquote id="scene-dialogue-${sceneNo}" class="placeholder-line">대사가 도착하면 표시됩니다.</blockquote>
-        <div class="emotion-row">
-          <span class="emotion-badge" id="scene-narration-emotion-${sceneNo}">나레이션 감정 대기</span>
-          <span class="emotion-badge" id="scene-dialogue-emotion-${sceneNo}">대사 감정 대기</span>
-        </div>
       </div>
       <div class="panel-grid" id="panel-grid-${sceneNo}">
         ${Array.from({ length: PANEL_COUNT }, (_, index) => `
@@ -246,11 +233,15 @@ function subtitleFor(data, counts) {
 
 function getCounts(data) {
   const scenes = data.scenes || [];
-  const story = (data.story_title ? 1 : 0) + scenes.filter((scene) => scene?.title).length;
+  // story_title 1개 + scenes 배열 길이 (LLM 완료 후 한번에 4개)
+  const story = (data.story_title ? 1 : 0) + scenes.length;
   const image = (data.cover_image_url ? 1 : 0) + scenes.reduce((sum, scene) => {
     return sum + getSceneSlots(scene).filter(Boolean).length;
   }, 0);
-  const audio = (data.cover_audio_url ? 1 : 0) + scenes.filter((scene) => scene?.audio_url).length;
+  const audio = (data.cover_audio_url ? 1 : 0) + scenes.filter((scene) => {
+    const scenarios = scene?.scenarios || [];
+    return Boolean((scenarios.find((s) => s.index === 1) || {}).audio_url);
+  }).length;
   return {
     story,
     image,
@@ -287,55 +278,47 @@ function renderCover(data) {
 function renderScenes(scenes) {
   for (let sceneNo = 1; sceneNo <= SCENE_COUNT; sceneNo += 1) {
     const scene = scenes.find((item) => item.scene_no === sceneNo) || {};
-    const hasMeta = Boolean(scene.title);
-    const imageSlots = getSceneSlots(scene);
-    const imageCount = imageSlots.filter(Boolean).length;
-    const hasAudio = Boolean(scene.audio_url);
+    const scenarios = scene.scenarios || [];
 
-    setText(`scene-title-${sceneNo}`, scene.title || '이야기 생성 대기', !hasMeta);
-    setText(`scene-narration-${sceneNo}`, scene.narration || '나레이션이 도착하면 표시됩니다.', !scene.narration);
-    setText(`scene-dialogue-${sceneNo}`, scene.dialogue || '대사가 도착하면 표시됩니다.', !scene.dialogue);
-    updateEmotion(`scene-narration-emotion-${sceneNo}`, '나레이션', scene.narration_emotion);
-    updateEmotion(`scene-dialogue-emotion-${sceneNo}`, '대사', scene.dialogue_emotion);
+    // index 1: 내레이션 텍스트 + 오디오, index 4: 대사 텍스트
+    const narrationStep = scenarios.find((s) => s.index === 1) || {};
+    const dialogueStep = scenarios.find((s) => s.index === 4) || {};
+    const narration = narrationStep.msg || '';
+    const dialogue = dialogueStep.msg || '';
+    const audioUrl = narrationStep.audio_url || '';
+
+    setText(`scene-narration-${sceneNo}`, narration || '나레이션이 도착하면 표시됩니다.', !narration);
+    setText(`scene-dialogue-${sceneNo}`, dialogue || '대사가 도착하면 표시됩니다.', !dialogue);
 
     const pill = document.getElementById(`scene-pill-${sceneNo}`);
-    const readyUnits = (hasMeta ? 1 : 0) + imageCount + (hasAudio ? 1 : 0);
-    pill.textContent = readyUnits >= 5 ? '완료' : `${readyUnits}/5`;
-    pill.classList.toggle('is-live', readyUnits > 0 && readyUnits < 5);
+    if (pill) {
+      const statusMap = { End: '완료', Running: '생성 중', Pending: '대기' };
+      pill.textContent = statusMap[scene.status] || '대기';
+      pill.classList.toggle('is-live', scene.status === 'Running');
+    }
 
+    const imageUrls = getSceneSlots(scene);
     for (let panel = 1; panel <= PANEL_COUNT; panel += 1) {
       updateImageSlot(
         `panel-slot-${sceneNo}-${panel}`,
         `panel-image-${sceneNo}-${panel}`,
-        imageSlots[panel - 1],
+        imageUrls[panel - 1],
         `패널 ${panel} 대기`,
       );
     }
 
-    updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, scene.audio_url);
+    updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, audioUrl);
   }
 }
 
 function getSceneSlots(scene) {
-  const slots = Array(PANEL_COUNT).fill('');
-  const overflow = [];
-
-  for (const url of scene?.image_urls || []) {
-    const slot = parsePanelIndex(url);
-    if (slot >= 1 && slot <= PANEL_COUNT) {
-      slots[slot - 1] = url;
-    } else {
-      overflow.push(url);
-    }
-  }
-
-  for (const url of overflow) {
-    const emptyIndex = slots.findIndex((value) => !value);
-    if (emptyIndex === -1) break;
-    slots[emptyIndex] = url;
-  }
-
-  return slots;
+  const scenarios = scene?.scenarios || [];
+  // index 0 → img_01, index 2 → img_02, index 3 → img_03
+  return [
+    (scenarios.find((s) => s.index === 0) || {}).image_url || '',
+    (scenarios.find((s) => s.index === 2) || {}).image_url || '',
+    (scenarios.find((s) => s.index === 3) || {}).image_url || '',
+  ];
 }
 
 function parsePanelIndex(url) {
@@ -398,13 +381,6 @@ function updateAudio(shellId, audioId, statusId, rawUrl) {
   audio.src = withCache(rawUrl);
   audio.hidden = false;
   audio.load();
-}
-
-function updateEmotion(id, prefix, emotion) {
-  const badge = document.getElementById(id);
-  if (!badge) return;
-  badge.textContent = emotion ? `${prefix}: ${EMOTION_LABELS[emotion] || emotion}` : `${prefix} 감정 대기`;
-  badge.dataset.emotion = emotion || '';
 }
 
 function setText(id, text, placeholder = false) {
@@ -535,10 +511,10 @@ function addEventLog(label) {
 function eventLabel(message) {
   if (message.status === 'FAILED') return '작업 실패';
   if (message.status === 'DONE') return '작업 완료';
-  if (message.cover_image) return '표지 이미지 도착';
-  if (message.cover_audio) return '표지 음성 도착';
-  if (message.image && message.scene_no) return `장면 ${message.scene_no} 이미지 도착`;
-  if (message.audio && message.scene_no) return `장면 ${message.scene_no} 음성 도착`;
+  if (message.cover_image_url) return '표지 이미지 도착';
+  if (message.cover_audio_url) return '표지 음성 도착';
+  if (message.image_url && message.scene_no) return `장면 ${message.scene_no} 이미지 도착`;
+  if (message.audio_url && message.scene_no) return `장면 ${message.scene_no} 음성 도착`;
   if (message.scene_no) return `장면 ${message.scene_no} 갱신`;
   return STAGE_LABELS[message.stage] || '상태 갱신';
 }
@@ -546,47 +522,31 @@ function eventLabel(message) {
 function applyEventHint(message) {
   if (!message || !state.runId) return;
 
-  const coverImageUrl = message.cover_image_url || imageUrlFromMessage(message.cover_image);
-  if (coverImageUrl) {
+  if (message.cover_image_url) {
     document.getElementById('cover-heading').textContent = '표지 준비 완료';
-    updateImageSlot('cover-image-slot', 'cover-image', coverImageUrl, '표지 이미지 대기');
+    updateImageSlot('cover-image-slot', 'cover-image', message.cover_image_url, '표지 이미지 대기');
   }
 
-  const coverAudioUrl = message.cover_audio_url || audioUrlFromMessage(message.cover_audio);
-  if (coverAudioUrl) {
-    updateAudio('cover-audio-shell', 'cover-audio', 'cover-audio-status', coverAudioUrl);
+  if (message.cover_audio_url) {
+    updateAudio('cover-audio-shell', 'cover-audio', 'cover-audio-status', message.cover_audio_url);
   }
 
   if (!message.scene_no) return;
 
   const sceneNo = Number(message.scene_no);
-  const sceneImageUrl = message.image_url || imageUrlFromMessage(message.image);
-  if (sceneImageUrl) {
-    const panel = parsePanelIndex(sceneImageUrl) || 1;
+  if (message.image_url) {
+    const panel = parsePanelIndex(message.image_url) || 1;
     updateImageSlot(
       `panel-slot-${sceneNo}-${panel}`,
       `panel-image-${sceneNo}-${panel}`,
-      sceneImageUrl,
+      message.image_url,
       `패널 ${panel} 대기`,
     );
   }
 
-  const sceneAudioUrl = message.audio_url || audioUrlFromMessage(message.audio);
-  if (sceneAudioUrl) {
-    updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, sceneAudioUrl);
+  if (message.audio_url) {
+    updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, message.audio_url);
   }
-}
-
-function imageUrlFromMessage(filename) {
-  if (!filename) return '';
-  if (filename.startsWith('http') || filename.startsWith('/api/')) return filename;
-  return `/api/runs/${state.runId}/images/${filename}`;
-}
-
-function audioUrlFromMessage(filename) {
-  if (!filename) return '';
-  if (filename.startsWith('http') || filename.startsWith('/api/')) return filename;
-  return `/api/runs/${state.runId}/audio/${filename}`;
 }
 
 function resetAll() {
@@ -621,12 +581,10 @@ function resetRunUI() {
   updateAudio('cover-audio-shell', 'cover-audio', 'cover-audio-status', '');
 
   for (let sceneNo = 1; sceneNo <= SCENE_COUNT; sceneNo += 1) {
-    setText(`scene-title-${sceneNo}`, '이야기 생성 대기', true);
     setText(`scene-narration-${sceneNo}`, '나레이션이 도착하면 표시됩니다.', true);
     setText(`scene-dialogue-${sceneNo}`, '대사가 도착하면 표시됩니다.', true);
-    updateEmotion(`scene-narration-emotion-${sceneNo}`, '나레이션', '');
-    updateEmotion(`scene-dialogue-emotion-${sceneNo}`, '대사', '');
-    document.getElementById(`scene-pill-${sceneNo}`).textContent = '대기';
+    const pill = document.getElementById(`scene-pill-${sceneNo}`);
+    if (pill) pill.textContent = '대기';
     for (let panel = 1; panel <= PANEL_COUNT; panel += 1) {
       updateImageSlot(`panel-slot-${sceneNo}-${panel}`, `panel-image-${sceneNo}-${panel}`, '', `패널 ${panel} 대기`);
     }
