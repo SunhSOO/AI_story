@@ -2,14 +2,14 @@ root ::= obj
 
 obj ::= "{" ws "\"title\"" ws ":" ws string ws "," ws "\"cover_prompt\"" ws ":" ws string ws "," ws "\"scenes\"" ws ":" ws "[" ws scene1 ws "," ws scene2 ws "," ws scene3 ws "," ws scene4 ws "]" ws "}"
 
-scene1 ::= "{" ws "\"scene_no\"" ws ":" ws "1" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"narration_emotion\"" ws ":" ws emotion ws "," ws "\"dialogue_emotion\"" ws ":" ws emotion ws "}"
-scene2 ::= "{" ws "\"scene_no\"" ws ":" ws "2" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"narration_emotion\"" ws ":" ws emotion ws "," ws "\"dialogue_emotion\"" ws ":" ws emotion ws "}"
-scene3 ::= "{" ws "\"scene_no\"" ws ":" ws "3" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"narration_emotion\"" ws ":" ws emotion ws "," ws "\"dialogue_emotion\"" ws ":" ws emotion ws "}"
-scene4 ::= "{" ws "\"scene_no\"" ws ":" ws "4" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"narration_emotion\"" ws ":" ws emotion ws "," ws "\"dialogue_emotion\"" ws ":" ws emotion ws "}"
+scene1 ::= "{" ws "\"scene_no\"" ws ":" ws "1" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"dialogue_emotion\"" ws ":" ws dialogue_emotion ws "}"
+scene2 ::= "{" ws "\"scene_no\"" ws ":" ws "2" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"dialogue_emotion\"" ws ":" ws dialogue_emotion ws "}"
+scene3 ::= "{" ws "\"scene_no\"" ws ":" ws "3" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"dialogue_emotion\"" ws ":" ws dialogue_emotion ws "}"
+scene4 ::= "{" ws "\"scene_no\"" ws ":" ws "4" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"dialogue_emotion\"" ws ":" ws dialogue_emotion ws "}"
 
 prompts3 ::= "[" ws string ws "," ws string ws "," ws string ws "]"
 
-emotion ::= "\"행복\"" | "\"슬픔\"" | "\"화남\"" | "\"밝음\"" | "\"긴장\"" | "\"무서움\""
+dialogue_emotion ::= "\"기쁨\"" | "\"슬픔\"" | "\"무서움\""
 
 string ::= "\"" schars "\""
 schars ::= "" | schar schars

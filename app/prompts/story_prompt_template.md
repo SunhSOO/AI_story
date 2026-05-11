@@ -11,21 +11,18 @@ User inputs:
 사용자가 준 입력을 바탕으로 4개의 장면으로 구성된 동화를 생성해야 한다.
 
 ### 이야기 구조 규칙
-1. scene 1: 시작 배경 (narration_emotion: 밝음, dialogue_emotion: 행복 권장)
-2. scene 2: 문제 발생 (narration_emotion: 긴장 또는 무서움, dialogue_emotion: 슬픔 또는 긴장 권장)
-3. scene 3: 해결 시도 (narration_emotion: 밝음 또는 긴장, dialogue_emotion: 밝음 또는 화남 권장)
-4. scene 4: 해결과 마무리 (narration_emotion: 행복 또는 밝음, dialogue_emotion: 행복 권장)
+1. scene 1: 시작 배경 (dialogue_emotion: 기쁨 권장)
+2. scene 2: 문제 발생 (dialogue_emotion: 슬픔 또는 무서움 권장)
+3. scene 3: 해결 시도 (dialogue_emotion: 무서움 또는 슬픔 권장)
+4. scene 4: 해결과 마무리 (dialogue_emotion: 기쁨 권장)
 
-### 감정/스타일 값
-`narration_emotion`과 `dialogue_emotion`은 반드시 아래 값 중 하나만 사용한다.
+### 대사 감정 값
+`dialogue_emotion`은 반드시 아래 3개 값 중 하나만 사용한다.
 
 | 값 | TTS 스타일 |
 | --- | --- |
-| 행복 | cheerful tone |
+| 기쁨 | joyful bright tone |
 | 슬픔 | sad emotional voice |
-| 화남 | angry aggressive tone |
-| 밝음 | bright energetic tone |
-| 긴장 | nervous hesitant voice |
 | 무서움 | fearful trembling voice |
 
 ### 언어 규칙
@@ -34,7 +31,6 @@ User inputs:
 - "narration": 한국어 동화체 3문장 서술 ("~했어요", "~했답니다")
 - "dialogue": 한국어, 해당 장면에서 등장인물이 직접 말하는 대사. 따옴표 없이 작성
 - "image_prompts": 반드시 영어, 쉼표로 구분된 태그 형식
-- "narration_emotion": 내레이션 또는 서술자의 음성 감정
 - "dialogue_emotion": 대사를 말하는 캐릭터의 감정
 
 ### 대사(dialogue) 규칙
@@ -66,8 +62,7 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
         "wide shot, full scene with background, English tags",
         "emotional atmosphere, different angle, English tags"
       ],
-      "narration_emotion": "밝음",
-      "dialogue_emotion": "행복"
+      "dialogue_emotion": "기쁨"
     },
     {
       "scene_no": 2,
@@ -78,7 +73,6 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
         "wide shot, full scene with background, {characters},English tags",
         "emotional atmosphere, different angle, {characters},English tags"
       ],
-      "narration_emotion": "긴장",
       "dialogue_emotion": "슬픔"
     },
     {
@@ -90,8 +84,7 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
         "wide shot, full scene with background and {characters}, English tags",
         "emotional atmosphere, different angle,{characters}, English tags"
       ],
-      "narration_emotion": "밝음",
-      "dialogue_emotion": "긴장"
+      "dialogue_emotion": "무서움"
     },
     {
       "scene_no": 4,
@@ -102,8 +95,7 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
         "wide shot, full scene with background,{characters}, English tags",
         "emotional atmosphere, different angle, {characters},English tags"
       ],
-      "narration_emotion": "행복",
-      "dialogue_emotion": "행복"
+      "dialogue_emotion": "기쁨"
     }
   ]
 }
@@ -114,5 +106,5 @@ REMINDER:
 - scenes array must have exactly 4 elements.
 - each scene must have narration AND dialogue (both Korean).
 - each scene's image_prompts must be an array of exactly 3 different English strings.
-- narration_emotion and dialogue_emotion must each be one of: 행복, 슬픔, 화남, 밝음, 긴장, 무서움.
+- dialogue_emotion must be one of: 기쁨, 슬픔, 무서움.
 - cover_prompt and image_prompts must be English only. No Chinese characters anywhere.

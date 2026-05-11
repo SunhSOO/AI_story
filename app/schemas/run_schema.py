@@ -48,7 +48,6 @@ class SceneInfo(BaseModel):
     scene_no: int
     narration: str = ""
     dialogue: str = ""
-    narration_emotion: str = ""
     dialogue_emotion: str = ""
     image_urls: list[str] = Field(default_factory=list)
     audio_url: str = ""

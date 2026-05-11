@@ -9,10 +9,9 @@ class SceneSchema(BaseModel):
     narration: str = Field(..., min_length=1)
     dialogue: str = Field(..., min_length=1, description="장면 내 캐릭터 발화 (한국어)")
     image_prompts: list[str] = Field(..., min_length=3, max_length=3)
-    narration_emotion: str = Field(...)
     dialogue_emotion: str = Field(...)
 
-    @field_validator("narration_emotion", "dialogue_emotion")
+    @field_validator("dialogue_emotion")
     @classmethod
     def validate_emotion(cls, v: str) -> str:
         if v not in ALLOWED_EMOTIONS:

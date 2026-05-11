@@ -45,12 +45,11 @@ class RunState:
     def init_scenes(self, scene_count: int) -> None:
         self.scenes = [SceneInfo(scene_no=i) for i in range(1, scene_count + 1)]
 
-    def update_scene_meta(self, scene_no: int, narration: str, dialogue: str, narration_emotion: str, dialogue_emotion: str) -> None:
+    def update_scene_meta(self, scene_no: int, narration: str, dialogue: str, dialogue_emotion: str) -> None:
         for s in self.scenes:
             if s.scene_no == scene_no:
                 s.narration = narration
                 s.dialogue = dialogue
-                s.narration_emotion = narration_emotion
                 s.dialogue_emotion = dialogue_emotion
                 return
 

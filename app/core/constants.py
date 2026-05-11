@@ -1,22 +1,10 @@
 """Project-wide constants."""
 
-ALLOWED_EMOTIONS = frozenset(
-    {
-        "행복",
-        "슬픔",
-        "화남",
-        "밝음",
-        "긴장",
-        "무서움",
-    }
-)
+ALLOWED_EMOTIONS = frozenset({"기쁨", "슬픔", "무서움"})
 
 EMOTION_STYLE_MAP = {
-    "행복": "cheerful tone",
+    "기쁨": "joyful bright tone",
     "슬픔": "sad emotional voice",
-    "화남": "angry aggressive tone",
-    "밝음": "bright energetic tone",
-    "긴장": "nervous hesitant voice",
     "무서움": "fearful trembling voice",
 }
 

@@ -121,7 +121,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
         for scene in story.scenes:
             run_state.update_scene_meta(
                 scene.scene_no, scene.narration,
-                scene.dialogue, scene.narration_emotion, scene.dialogue_emotion,
+                scene.dialogue, scene.dialogue_emotion,
             )
         storage_service.save_story(run_id, story)
         await _emit(run_state)
@@ -157,7 +157,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                     scene_no=scene_no,
                     narration=scene.narration,
                     dialogue=scene.dialogue,
-                    narration_emotion=scene.narration_emotion,
+                    narration_emotion="",
                     dialogue_emotion=scene.dialogue_emotion,
                 )
                 filename = f"scene_{scene_no:02d}.wav"
