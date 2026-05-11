@@ -39,10 +39,13 @@ async def health():
 async def llm_generate(req: LLMRequest):
     loop = asyncio.get_event_loop()
     from app.services.story_service import generate_story
-    story = await loop.run_in_executor(
-        None, generate_story, req.era_ko, req.place_ko, req.characters_ko, req.topic_ko, req.seed
-    )
-    return story.model_dump()
+    try:
+        story = await loop.run_in_executor(
+            None, generate_story, req.era_ko, req.place_ko, req.characters_ko, req.topic_ko, req.seed
+        )
+        return story.model_dump()
+    finally:
+        await loop.run_in_executor(None, _cleanup_llm)
 
 
 @app.post("/image/generate")
@@ -85,16 +88,13 @@ def _generate_image_bytes(prompt: str, seed: int, stem: str) -> bytes:
     from app.clients.comfyui_client import ComfyUIClient, generate_image_bytes
     from app.core.config import settings
     client = ComfyUIClient()
-    try:
-        return generate_image_bytes(
-            prompt=prompt,
-            seed=seed,
-            stem=stem,
-            workflow_path=settings.workflow_path,
-            client=client,
-        )
-    finally:
-        client.free_memory(unload_models=False)
+    return generate_image_bytes(
+        prompt=prompt,
+        seed=seed,
+        stem=stem,
+        workflow_path=settings.workflow_path,
+        client=client,
+    )
 
 
 def _generate_tts_bytes(req: TTSRequest) -> bytes:
@@ -149,15 +149,27 @@ def _unload_tts() -> None:
         print(f"[CLEANUP] TTS unload: {e}")
 
 
-def _do_cleanup() -> None:
+def _cleanup_llm() -> None:
     import subprocess, sys
 
-    # llama-cli 프로세스 강제 종료 (혹시 남아있을 경우)
     if sys.platform == "win32":
         try:
             subprocess.run(["taskkill", "/F", "/IM", "llama-cli.exe"], capture_output=True, check=False)
         except Exception as e:
             print(f"[CLEANUP] llama-cli kill: {e}")
+
+    try:
+        gc.collect()
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print("[WORKER] LLM VRAM/cache cleanup done")
+    except Exception as e:
+        print(f"[CLEANUP] LLM torch: {e}")
+
+
+def _do_cleanup() -> None:
+    _cleanup_llm()
 
     _unload_tts()
 

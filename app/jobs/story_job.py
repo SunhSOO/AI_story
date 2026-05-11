@@ -15,15 +15,12 @@ from app.services.run_service import RunRegistry, RunState
 # ── 이미지 분배 정의 ──────────────────────────────────────────────────────────
 # {scene_no: [img_idx, ...]}  img_idx는 1-based
 _WORKER_IMAGES: dict[int, list[int]] = {
-    2: [1, 3],
-    3: [2],  
-    4: [1, 3],   
+    2: [1, 2, 3],
+    3: [1, 2, 3],
 }
 _LOCAL_IMAGES: dict[int, list[int]] = {
     1: [1, 2, 3],
-    2: [2],
-    3: [1, 3],
-    4: [2]  
+    4: [1, 2, 3],
 }
 
 _MAX_SEED = 2_147_483_647
@@ -221,13 +218,10 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
             local_client = ComfyUIClient()
 
             print("[LOCAL] Generating cover image on 3080...")
-            try:
-                cover_image = await loop.run_in_executor(
-                    None, generate_cover_image,
-                    story.cover_prompt, run_dir, base_seed, None, local_client,
-                )
-            finally:
-                await loop.run_in_executor(None, local_client.free_memory, False)
+            cover_image = await loop.run_in_executor(
+                None, generate_cover_image,
+                story.cover_prompt, run_dir, base_seed, None, local_client,
+            )
             run_state.set_cover_image(cover_image)
             await _emit(
                 run_state,
@@ -242,13 +236,10 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 scene = story.scenes[scene_no - 1]
                 for idx in img_idxs:
                     print(f"[LOCAL] Generating scene {scene_no} img {idx} on 3080...")
-                    try:
-                        filename = await loop.run_in_executor(
-                            None, generate_scene_image_at,
-                            scene, run_dir, base_seed, idx, None, local_client,
-                        )
-                    finally:
-                        await loop.run_in_executor(None, local_client.free_memory, False)
+                    filename = await loop.run_in_executor(
+                        None, generate_scene_image_at,
+                        scene, run_dir, base_seed, idx, None, local_client,
+                    )
                     run_state.add_scene_image(scene_no, filename)
                     await _emit(
                         run_state,

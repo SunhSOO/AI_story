@@ -143,8 +143,13 @@ def call_llama(prompt: str, tmp_prompt_path: Path | None = None, seed: int | Non
     if process.poll() is None:
         try:
             process.terminate()
+            process.wait(timeout=5)
         except Exception:
-            pass
+            try:
+                process.kill()
+                process.wait(timeout=5)
+            except Exception:
+                pass
 
     raw = "".join(chunks)
     return _extract_json(raw)
