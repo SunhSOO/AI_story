@@ -1,4 +1,5 @@
-"""voxcpm2 TTS client: emotion-aware speech synthesis."""
+"""voxcpm2 TTS client."""
+import re
 import sys
 import threading
 import concurrent.futures
@@ -7,10 +8,32 @@ from pathlib import Path
 import numpy as np
 
 from app.core.config import settings
-from app.core.constants import EMOTION_STYLE_MAP
 from app.core.exceptions import TTSError
 
-_STYLE_MAP = EMOTION_STYLE_MAP
+_WHITESPACE_RE = re.compile(r"\s+")
+_BRACKETED_TTS_NOTE_RE = re.compile(r"[\(\[\{<（［｛【「『][^)\]\}>）］｝】」』]*[\)\]\}>）］｝】」』]")
+_ALLOWED_TTS_PUNCTUATION = {"!", "?", ","}
+
+
+def _is_tts_text_char(ch: str) -> bool:
+    if ch.isspace() or ch in _ALLOWED_TTS_PUNCTUATION:
+        return True
+    cp = ord(ch)
+    return (
+        "0" <= ch <= "9"
+        or "A" <= ch <= "Z"
+        or "a" <= ch <= "z"
+        or 0xAC00 <= cp <= 0xD7A3
+        or 0x1100 <= cp <= 0x11FF
+        or 0x3130 <= cp <= 0x318F
+    )
+
+
+def _clean_tts_text(text: str) -> str:
+    text = _BRACKETED_TTS_NOTE_RE.sub(" ", text)
+    cleaned = "".join(ch for ch in text if _is_tts_text_char(ch))
+    return _WHITESPACE_RE.sub(" ", cleaned).strip()
+
 
 # TTS는 torch.compile + CUDA graph가 스레드 TLS에 바인딩되므로
 # 항상 동일한 단일 스레드에서 실행해야 한다.
@@ -91,16 +114,8 @@ def _get_model():
 
 
 def _generate_wav(text: str, emotion: str | None, ref_wav: Path):
-    """Internal: run model.generate and return (wav_array, sample_rate).
-
-    emotion=None → no style prefix (neutral narration).
-    emotion set  → prepend style prefix for emotion-aware synthesis.
-    """
-    if emotion:
-        style = _STYLE_MAP.get(emotion, emotion)
-        tts_text = f"({style}){text}"
-    else:
-        tts_text = text
+    """Internal: run model.generate and return (wav_array, sample_rate)."""
+    tts_text = _clean_tts_text(text)
 
     model = _get_model()
     try:
@@ -122,10 +137,7 @@ def synthesize(
     output_path: Path,
     reference_wav: Path | None = None,
 ) -> None:
-    """Synthesize a single text segment and save to output_path.
-
-    emotion=None → neutral (no style prefix).
-    """
+    """Synthesize a single text segment and save to output_path."""
     try:
         import soundfile as sf
     except ImportError as e:
@@ -144,15 +156,11 @@ def synthesize_narration_dialogue(
     narration: str,
     dialogue: str,
     narration_emotion: str | None,
-    dialogue_emotion: str,
+    dialogue_emotion: str | None,
     output_path: Path,
     reference_wav: Path | None = None,
 ) -> None:
-    """Synthesize narration + dialogue with independent emotions, concatenate, save.
-
-    Inserts 0.5 s silence between the two segments.
-    narration_emotion=None → neutral narration.
-    """
+    """Synthesize narration + dialogue, concatenate with 0.5 s silence, and save."""
     try:
         import soundfile as sf
     except ImportError as e:

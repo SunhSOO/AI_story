@@ -158,7 +158,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                     narration=scene.narration,
                     dialogue=scene.dialogue,
                     narration_emotion="",
-                    dialogue_emotion=scene.dialogue_emotion,
+                    dialogue_emotion="",
                 )
                 filename = f"scene_{scene_no:02d}.wav"
                 audio_path = run_dir / "audio" / filename

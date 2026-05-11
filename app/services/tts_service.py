@@ -1,4 +1,4 @@
-"""TTS generation service using voxcpm2 with emotion support."""
+"""TTS generation service using voxcpm2."""
 from pathlib import Path
 
 from app.clients.voxcpm2_client import synthesize, synthesize_narration_dialogue
@@ -21,9 +21,6 @@ def generate_cover_audio(title: str, run_dir: Path) -> str:
 def generate_scene_audio(scene: SceneSchema, run_dir: Path) -> str:
     """Synthesize audio for a single scene and save to run_dir/audio/.
 
-    - If dialogue exists: narration (narration_emotion) + 0.5 s silence + dialogue (dialogue_emotion)
-    - Otherwise: narration only (narration_emotion)
-
     Returns filename relative to run_dir/audio/.
     """
     output_path = _scene_audio_path(run_dir, scene.scene_no)
@@ -32,14 +29,14 @@ def generate_scene_audio(scene: SceneSchema, run_dir: Path) -> str:
         synthesize_narration_dialogue(
             narration=scene.narration,
             dialogue=scene.dialogue,
-            narration_emotion=scene.narration_emotion,
-            dialogue_emotion=scene.dialogue_emotion,
+            narration_emotion=None,
+            dialogue_emotion=None,
             output_path=output_path,
         )
     else:
-        synthesize(text=scene.narration, emotion=scene.narration_emotion, output_path=output_path)
+        synthesize(text=scene.narration, emotion=None, output_path=output_path)
 
-    print(f"[TTS] scene {scene.scene_no} (narration={scene.narration_emotion}, dialogue={scene.dialogue_emotion}) → {output_path.name}")
+    print(f"[TTS] scene {scene.scene_no} → {output_path.name}")
     return output_path.name
 
 

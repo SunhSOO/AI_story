@@ -107,12 +107,12 @@ def _generate_tts_bytes(req: TTSRequest) -> bytes:
             synthesize_narration_dialogue(
                 narration=req.narration,
                 dialogue=req.dialogue,
-                narration_emotion=req.narration_emotion,
-                dialogue_emotion=req.dialogue_emotion,
+                narration_emotion=None,
+                dialogue_emotion=None,
                 output_path=output_path,
             )
         else:
-            synthesize(text=req.narration, emotion=req.narration_emotion, output_path=output_path)
+            synthesize(text=req.narration, emotion=None, output_path=output_path)
 
         return output_path.read_bytes()
 
