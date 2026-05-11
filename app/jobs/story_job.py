@@ -3,6 +3,8 @@ import asyncio
 import gc
 import random
 import time
+import wave
+from pathlib import Path
 
 from app.core.config import settings
 from app.schemas.run_schema import RunStage, RunStatus
@@ -23,6 +25,16 @@ _LOCAL_IMAGES: dict[int, list[int]] = {
     3: [1, 3],
     4: [2]  
 }
+
+
+def _wav_image_delay(path: Path) -> int:
+    """WAV 재생시간을 3으로 나눠 반올림한 이미지 딜레이(초) 반환. 읽기 실패 시 1."""
+    try:
+        with wave.open(str(path), "rb") as f:
+            duration = f.getnframes() / f.getframerate()
+        return max(1, round(duration / 3))
+    except Exception:
+        return 1
 
 
 async def _emit(run_state: RunState, extra: dict | None = None) -> None:
@@ -108,7 +120,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
         run_state.init_scenes(settings.scene_count)
         for scene in story.scenes:
             run_state.update_scene_meta(
-                scene.scene_no, scene.title, scene.narration,
+                scene.scene_no, scene.narration,
                 scene.dialogue, scene.narration_emotion, scene.dialogue_emotion,
             )
         storage_service.save_story(run_id, story)
@@ -152,7 +164,8 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 audio_path = run_dir / "audio" / filename
                 audio_path.parent.mkdir(parents=True, exist_ok=True)
                 audio_path.write_bytes(wav_bytes)
-                run_state.set_scene_audio(scene_no, filename)
+                image_delay = _wav_image_delay(audio_path)
+                run_state.set_scene_audio(scene_no, filename, image_delay)
                 await _emit(
                     run_state,
                     {

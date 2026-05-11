@@ -31,7 +31,6 @@ User inputs:
 ### 언어 규칙
 - "title" (동화 전체 제목): 한국어
 - "cover_prompt": 반드시 영어, 동화 전체를 대표하는 표지 이미지 프롬프트 (태그 형식)
-- 각 scene의 "title": 한국어
 - "narration": 한국어 동화체 3문장 서술 ("~했어요", "~했답니다")
 - "dialogue": 한국어, 해당 장면에서 등장인물이 직접 말하는 대사. 따옴표 없이 작성
 - "image_prompts": 반드시 영어, 쉼표로 구분된 태그 형식
@@ -60,11 +59,10 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
   "scenes": [
     {
       "scene_no": 1,
-      "title": "장면 제목",
       "narration": "장면 내레이션 (한국어 3문장 서술)",
       "dialogue": "안녕! 나는 새로운 친구를 만나고 싶어.",
       "image_prompts": [
-        "close-up of main character, key moment, English tags",
+        "close-up of main {characters}, key moment, English tags",
         "wide shot, full scene with background, English tags",
         "emotional atmosphere, different angle, English tags"
       ],
@@ -73,39 +71,36 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
     },
     {
       "scene_no": 2,
-      "title": "장면 제목",
       "narration": "장면 내레이션 (한국어 3문장 서술)",
       "dialogue": "어쩌지... 길을 잃은 것 같아.",
       "image_prompts": [
-        "close-up of main character, key moment, English tags",
-        "wide shot, full scene with background, English tags",
-        "emotional atmosphere, different angle, English tags"
+        "close-up of main {characters}, key moment, English tags",
+        "wide shot, full scene with background, {characters},English tags",
+        "emotional atmosphere, different angle, {characters},English tags"
       ],
       "narration_emotion": "긴장",
       "dialogue_emotion": "슬픔"
     },
     {
       "scene_no": 3,
-      "title": "장면 제목",
       "narration": "장면 내레이션 (한국어 3문장 서술)",
       "dialogue": "포기하지 말자! 한 번만 더 해볼게.",
       "image_prompts": [
-        "close-up of main character, key moment, English tags",
-        "wide shot, full scene with background, English tags",
-        "emotional atmosphere, different angle, English tags"
+        "close-up of main {characters}, key moment, English tags",
+        "wide shot, full scene with background and {characters}, English tags",
+        "emotional atmosphere, different angle,{characters}, English tags"
       ],
       "narration_emotion": "밝음",
       "dialogue_emotion": "긴장"
     },
     {
       "scene_no": 4,
-      "title": "장면 제목",
       "narration": "장면 내레이션 (한국어 3문장 서술)",
       "dialogue": "우리 함께라면 무엇이든 할 수 있어!",
       "image_prompts": [
-        "close-up of main character, key moment, English tags",
-        "wide shot, full scene with background, English tags",
-        "emotional atmosphere, different angle, English tags"
+        "close-up of main {characters}, key moment, English tags",
+        "wide shot, full scene with background,{characters}, English tags",
+        "emotional atmosphere, different angle, {characters},English tags"
       ],
       "narration_emotion": "행복",
       "dialogue_emotion": "행복"

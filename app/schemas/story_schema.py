@@ -6,7 +6,6 @@ from app.core.constants import ALLOWED_EMOTIONS, SCENE_COUNT
 
 class SceneSchema(BaseModel):
     scene_no: int = Field(..., ge=1, le=4)
-    title: str = Field(..., min_length=1)
     narration: str = Field(..., min_length=1)
     dialogue: str = Field(..., min_length=1, description="장면 내 캐릭터 발화 (한국어)")
     image_prompts: list[str] = Field(..., min_length=3, max_length=3)

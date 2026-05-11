@@ -29,7 +29,7 @@ class RunState:
             story_title=self.story_title,
             cover_image_url=self.cover_image_url,
             cover_audio_url=self.cover_audio_url,
-            scenes=self.scenes,
+            scenes=[s.to_scenario_info() for s in self.scenes],
             error=self.error,
         )
 
@@ -45,10 +45,9 @@ class RunState:
     def init_scenes(self, scene_count: int) -> None:
         self.scenes = [SceneInfo(scene_no=i) for i in range(1, scene_count + 1)]
 
-    def update_scene_meta(self, scene_no: int, title: str, narration: str, dialogue: str, narration_emotion: str, dialogue_emotion: str) -> None:
+    def update_scene_meta(self, scene_no: int, narration: str, dialogue: str, narration_emotion: str, dialogue_emotion: str) -> None:
         for s in self.scenes:
             if s.scene_no == scene_no:
-                s.title = title
                 s.narration = narration
                 s.dialogue = dialogue
                 s.narration_emotion = narration_emotion
@@ -63,10 +62,11 @@ class RunState:
                     s.image_urls.append(url)
                 return
 
-    def set_scene_audio(self, scene_no: int, filename: str) -> None:
+    def set_scene_audio(self, scene_no: int, filename: str, image_delay: int = 1) -> None:
         for s in self.scenes:
             if s.scene_no == scene_no:
                 s.audio_url = f"/api/runs/{self.run_id}/audio/{filename}"
+                s.image_delay = image_delay
                 return
 
 

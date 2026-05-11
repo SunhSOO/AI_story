@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python -c ' *)",
       "Bash(grep -v -E \"^\\(app|ComfyUI|llama\\\\.cpp|llm_model|voxcpm2TTS|outputs|static|\\\\.git\\)$\")",
-      "PowerShell(head -50)"
+      "PowerShell(head -50)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\sunhy\\\\Desktop\\\\AI_story\" -Recurse -Name)"
     ]
   }
 }

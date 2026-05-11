@@ -29,20 +29,60 @@ class CreateRunResponse(BaseModel):
     run_id: str
 
 
-class SceneImageInfo(BaseModel):
+class ScenarioItem(BaseModel):
+    index: int
+    msg: str = ""
+    audio_url: str = ""
+    image_url: str = ""
+    delay: int = 0
+
+
+class SceneScenarioInfo(BaseModel):
     scene_no: int
-    image_urls: list[str] = Field(default_factory=list)
+    status: str = "Pending"
+    scenarios: list[ScenarioItem] = Field(default_factory=list)
+    error: Optional[str] = None
 
 
 class SceneInfo(BaseModel):
     scene_no: int
-    title: str = ""
     narration: str = ""
     dialogue: str = ""
     narration_emotion: str = ""
     dialogue_emotion: str = ""
     image_urls: list[str] = Field(default_factory=list)
     audio_url: str = ""
+    image_delay: int = 1
+
+    def to_scenario_info(self) -> SceneScenarioInfo:
+        has_audio = bool(self.audio_url)
+        has_all_images = len(self.image_urls) >= 3
+
+        if has_audio and has_all_images:
+            scene_status = "End"
+        elif has_audio or self.image_urls:
+            scene_status = "Running"
+        else:
+            scene_status = "Pending"
+
+        img_urls = self.image_urls[:3]
+        while len(img_urls) < 3:
+            img_urls.append("")
+
+        d = self.image_delay
+        scenarios = [
+            ScenarioItem(index=0, msg="", audio_url="", image_url=img_urls[0], delay=d),
+            ScenarioItem(index=1, msg=self.narration, audio_url=self.audio_url, image_url="", delay=0),
+            ScenarioItem(index=2, msg="", audio_url="", image_url=img_urls[1], delay=d),
+            ScenarioItem(index=3, msg="", audio_url="", image_url=img_urls[2], delay=d),
+            ScenarioItem(index=4, msg=self.dialogue, audio_url="", image_url="", delay=0),
+        ]
+
+        return SceneScenarioInfo(
+            scene_no=self.scene_no,
+            status=scene_status,
+            scenarios=scenarios,
+        )
 
 
 class RunStateResponse(BaseModel):
@@ -52,5 +92,5 @@ class RunStateResponse(BaseModel):
     story_title: str = ""
     cover_image_url: str = ""
     cover_audio_url: str = ""
-    scenes: list[SceneInfo] = Field(default_factory=list)
+    scenes: list[SceneScenarioInfo] = Field(default_factory=list)
     error: Optional[str] = None

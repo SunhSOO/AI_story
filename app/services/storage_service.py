@@ -2,6 +2,7 @@
 import json
 import re
 import shutil
+import wave
 from pathlib import Path
 
 from app.core.config import settings
@@ -48,7 +49,7 @@ def load_run_response(run_id: str) -> RunStateResponse | None:
             story_data = {}
 
     story_title = str(story_data.get("title") or "")
-    scenes = _load_scene_infos(run_id, run_dir, story_data)
+    scene_infos = _load_scene_infos(run_id, run_dir, story_data)
     cover_image_url = _asset_url(run_id, "images", "cover.png") if (run_dir / "images" / "cover.png").exists() else ""
     cover_audio_url = _asset_url(run_id, "audio", "cover.wav") if (run_dir / "audio" / "cover.wav").exists() else ""
 
@@ -56,23 +57,23 @@ def load_run_response(run_id: str) -> RunStateResponse | None:
         story_title
         and cover_image_url
         and cover_audio_url
-        and len(scenes) >= settings.scene_count
+        and len(scene_infos) >= settings.scene_count
         and all(
-            scene.title
-            and scene.audio_url
-            and len(scene.image_urls) >= settings.images_per_scene
-            for scene in scenes[: settings.scene_count]
+            s.narration
+            and s.audio_url
+            and len(s.image_urls) >= settings.images_per_scene
+            for s in scene_infos[: settings.scene_count]
         )
     )
 
     return RunStateResponse(
         run_id=run_id,
         status=RunStatus.DONE if complete else RunStatus.FAILED,
-        stage=RunStage.IMAGE if cover_image_url or any(s.image_urls for s in scenes) else RunStage.LLM,
+        stage=RunStage.IMAGE if cover_image_url or any(s.image_urls for s in scene_infos) else RunStage.LLM,
         story_title=story_title,
         cover_image_url=cover_image_url,
         cover_audio_url=cover_audio_url,
-        scenes=scenes,
+        scenes=[s.to_scenario_info() for s in scene_infos],
         error=None if complete else "서버가 재시작되어 파일에서 가능한 결과만 복구했습니다.",
     )
 
@@ -90,13 +91,13 @@ def _load_scene_infos(run_id: str, run_dir: Path, story_data: dict) -> list[Scen
         scenes.append(
             SceneInfo(
                 scene_no=scene_no,
-                title=str(raw.get("title") or ""),
                 narration=str(raw.get("narration") or ""),
                 dialogue=str(raw.get("dialogue") or ""),
                 narration_emotion=str(raw.get("narration_emotion") or ""),
                 dialogue_emotion=str(raw.get("dialogue_emotion") or ""),
                 image_urls=_scene_image_urls(run_id, run_dir, scene_no),
                 audio_url=_scene_audio_url(run_id, run_dir, scene_no),
+                image_delay=_scene_image_delay(run_dir, scene_no),
             )
         )
     return scenes
@@ -115,6 +116,19 @@ def _scene_image_urls(run_id: str, run_dir: Path, scene_no: int) -> list[str]:
 def _scene_audio_url(run_id: str, run_dir: Path, scene_no: int) -> str:
     filename = f"scene_{scene_no:02d}.wav"
     return _asset_url(run_id, "audio", filename) if (run_dir / "audio" / filename).exists() else ""
+
+
+def _scene_image_delay(run_dir: Path, scene_no: int) -> int:
+    """WAV 재생시간 / 3 반올림. 파일 없거나 읽기 실패 시 1."""
+    path = run_dir / "audio" / f"scene_{scene_no:02d}.wav"
+    if not path.exists():
+        return 1
+    try:
+        with wave.open(str(path), "rb") as f:
+            duration = f.getnframes() / f.getframerate()
+        return max(1, round(duration / 3))
+    except Exception:
+        return 1
 
 
 def _image_index(filename: str) -> int:
