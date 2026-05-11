@@ -6,7 +6,7 @@ from app.schemas.story_schema import StorySchema
 _LLM_TIMEOUT = aiohttp.ClientTimeout(total=900)
 _IMG_TIMEOUT = aiohttp.ClientTimeout(total=300)
 _TTS_TIMEOUT = aiohttp.ClientTimeout(total=120)
-_CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=30)
+_CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 
 class WorkerClient:
@@ -14,7 +14,12 @@ class WorkerClient:
         self.base_url = base_url.rstrip("/")
 
     async def generate_story(
-        self, era_ko: str, place_ko: str, characters_ko: str, topic_ko: str
+        self,
+        era_ko: str,
+        place_ko: str,
+        characters_ko: str,
+        topic_ko: str,
+        seed: int | None = None,
     ) -> StorySchema:
         async with aiohttp.ClientSession(timeout=_LLM_TIMEOUT) as session:
             async with session.post(
@@ -24,6 +29,7 @@ class WorkerClient:
                     "place_ko": place_ko,
                     "characters_ko": characters_ko,
                     "topic_ko": topic_ko,
+                    "seed": seed,
                 },
             ) as resp:
                 resp.raise_for_status()

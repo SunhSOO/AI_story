@@ -24,7 +24,13 @@ def _build_prompt(era: str, place: str, characters: str, topic: str) -> str:
     )
 
 
-def generate_story(era: str, place: str, characters: str, topic: str) -> StorySchema:
+def generate_story(
+    era: str,
+    place: str,
+    characters: str,
+    topic: str,
+    seed: int | None = None,
+) -> StorySchema:
     """Run LLM and return a validated StorySchema.
 
     Retries up to settings.llm_max_retries times.
@@ -40,7 +46,7 @@ def generate_story(era: str, place: str, characters: str, topic: str) -> StorySc
     for attempt in range(settings.llm_max_retries):
         print(f"\n=== LLM attempt {attempt + 1}/{settings.llm_max_retries} ===")
         try:
-            json_str = call_llama(current_prompt)
+            json_str = call_llama(current_prompt, seed=seed)
             story_dict = json.loads(json_str)
             story = StorySchema.model_validate(story_dict)
             return story

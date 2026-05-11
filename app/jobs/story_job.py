@@ -26,6 +26,8 @@ _LOCAL_IMAGES: dict[int, list[int]] = {
     4: [2]  
 }
 
+_MAX_SEED = 2_147_483_647
+
 
 def _wav_image_delay(path: Path) -> int:
     """WAV 재생시간을 3으로 나눠 반올림한 이미지 딜레이(초) 반환. 읽기 실패 시 1."""
@@ -98,6 +100,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
     run_dir = registry.get_run_dir(run_id)
     loop = asyncio.get_event_loop()
+    cleanup_done = False
 
     try:
         run_state.status = RunStatus.RUNNING
@@ -106,13 +109,15 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
         await _cleanup_system("pre-pipeline cleanup")
 
         # ── Stage 1: LLM on 5080 worker ──────────────────────────────────────
+        story_seed = random.randint(1, _MAX_SEED)
+        print(f"[SEED] story seed: {story_seed}")
         print(f"\n[LLM] Requesting from worker: {settings.worker_url}")
         t0 = time.time()
         worker = WorkerClient(settings.worker_url)
 
         req = run_state.request
         story = await worker.generate_story(
-            req.era_ko, req.place_ko, req.characters_ko, req.topic_ko
+            req.era_ko, req.place_ko, req.characters_ko, req.topic_ko, seed=story_seed
         )
         print(f"[LLM] Done in {time.time() - t0:.1f}s — '{story.title}'")
 
@@ -123,14 +128,14 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 scene.scene_no, scene.narration,
                 scene.dialogue, scene.dialogue_emotion,
             )
-        storage_service.save_story(run_id, story)
+        storage_service.save_story(run_id, story, seed=story_seed)
         await _emit(run_state)
 
         # ── Stage 2: 병렬 실행 ────────────────────────────────────────────────
         run_state.stage = RunStage.PARALLEL
         await _emit(run_state)
 
-        base_seed = random.randint(0, 9_999_999)
+        base_seed = story_seed
 
         # Branch A (5080 Worker): all TTS plus assigned images
         async def _worker_branch():
@@ -186,7 +191,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 for idx in img_idxs:
                     stem = f"scene_{scene_no:02d}_img_{idx:02d}"
                     filename = f"{stem}.png"
-                    seed = base_seed + scene_no * 10 + idx
+                    seed = base_seed
                     prompt = scene.image_prompts[idx - 1]
                     print(f"[WORKER] Generating scene {scene_no} img {idx} on 5080...")
                     img_bytes = await worker.generate_image(prompt, seed, stem)
@@ -216,10 +221,13 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
             local_client = ComfyUIClient()
 
             print("[LOCAL] Generating cover image on 3080...")
-            cover_image = await loop.run_in_executor(
-                None, generate_cover_image,
-                story.cover_prompt, run_dir, base_seed, None, local_client,
-            )
+            try:
+                cover_image = await loop.run_in_executor(
+                    None, generate_cover_image,
+                    story.cover_prompt, run_dir, base_seed, None, local_client,
+                )
+            finally:
+                await loop.run_in_executor(None, local_client.free_memory, False)
             run_state.set_cover_image(cover_image)
             await _emit(
                 run_state,
@@ -234,10 +242,13 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 scene = story.scenes[scene_no - 1]
                 for idx in img_idxs:
                     print(f"[LOCAL] Generating scene {scene_no} img {idx} on 3080...")
-                    filename = await loop.run_in_executor(
-                        None, generate_scene_image_at,
-                        scene, run_dir, base_seed, idx, None, local_client,
-                    )
+                    try:
+                        filename = await loop.run_in_executor(
+                            None, generate_scene_image_at,
+                            scene, run_dir, base_seed, idx, None, local_client,
+                        )
+                    finally:
+                        await loop.run_in_executor(None, local_client.free_memory, False)
                     run_state.add_scene_image(scene_no, filename)
                     await _emit(
                         run_state,
@@ -264,6 +275,9 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
         await asyncio.gather(_worker_branch(), _local_branch())
 
+        await _cleanup_system("generation-complete VRAM cleanup", worker=worker)
+        cleanup_done = True
+
         # ── Done ──────────────────────────────────────────────────────────────
         run_state.status = RunStatus.DONE
         run_state.stage = RunStage.IMAGE
@@ -277,4 +291,5 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
         await _emit(run_state, {"error": str(exc)})
 
     finally:
-        await _cleanup_system("post-pipeline cleanup", worker=worker)
+        if not cleanup_done:
+            await _cleanup_system("post-pipeline cleanup", worker=worker)

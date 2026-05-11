@@ -21,10 +21,13 @@ def create_run_dirs(run_id: str) -> Path:
     return run_dir
 
 
-def save_story(run_id: str, story: StorySchema) -> None:
+def save_story(run_id: str, story: StorySchema, seed: int | None = None) -> None:
     run_dir = get_run_dir(run_id)
     path = run_dir / "story.json"
-    path.write_text(story.model_dump_json(indent=2), encoding="utf-8")
+    data = story.model_dump()
+    if seed is not None:
+        data["seed"] = seed
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def append_event(run_id: str, event: dict) -> None:

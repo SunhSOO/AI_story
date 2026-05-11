@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.exceptions import LLMError
 
 
-def _build_cmd(prompt_file: Path) -> list[str]:
+def _build_cmd(prompt_file: Path, seed: int | None = None) -> list[str]:
     cmd = [
         str(settings.llama_cli),
         "-m", str(settings.gguf_model),
@@ -20,6 +20,8 @@ def _build_cmd(prompt_file: Path) -> list[str]:
         "-ngl", "99",
         "-c", str(settings.llm_ctx),
     ]
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
     return cmd
 
 
@@ -52,7 +54,7 @@ def _extract_json(raw: str) -> str:
     raise LLMError("Incomplete JSON in LLM output")
 
 
-def call_llama(prompt: str, tmp_prompt_path: Path | None = None) -> str:
+def call_llama(prompt: str, tmp_prompt_path: Path | None = None, seed: int | None = None) -> str:
     """Run llama.cpp CLI and return the raw JSON string from stdout.
 
     Args:
@@ -71,7 +73,7 @@ def call_llama(prompt: str, tmp_prompt_path: Path | None = None) -> str:
     except OSError as e:
         raise LLMError(f"Failed to write prompt file: {e}") from e
 
-    cmd = _build_cmd(prompt_file)
+    cmd = _build_cmd(prompt_file, seed)
 
     try:
         process = subprocess.Popen(

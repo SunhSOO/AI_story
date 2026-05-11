@@ -57,7 +57,7 @@ def generate_scene_images(
 
     for idx in range(1, settings.images_per_scene + 1):
         output_path = _scene_image_path(run_dir, scene.scene_no, idx)
-        seed = base_seed + (scene.scene_no * 10) + idx
+        seed = base_seed
         prompt = scene.image_prompts[idx - 1]
         filename = generate_single_image(
             prompt=prompt,
@@ -84,7 +84,7 @@ def generate_scene_image_at(
     wf_path = workflow_path or settings.workflow_path
     client = client or ComfyUIClient()
     output_path = _scene_image_path(run_dir, scene.scene_no, img_idx)
-    seed = base_seed + (scene.scene_no * 10) + img_idx
+    seed = base_seed
     prompt = scene.image_prompts[img_idx - 1]
     filename = generate_single_image(
         prompt=prompt,
@@ -111,7 +111,7 @@ def generate_all_images(
     if not client.is_running():
         raise ImageGenError("ComfyUI is not running")
 
-    base_seed = random.randint(0, 9_999_999)
+    base_seed = random.randint(1, 2_147_483_647)
     result: dict[int, list[str]] = {}
 
     for scene in scenes:

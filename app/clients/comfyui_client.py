@@ -54,12 +54,12 @@ class ComfyUIClient:
         r.raise_for_status()
         return r.content
 
-    def free_memory(self) -> bool:
+    def free_memory(self, unload_models: bool = True) -> bool:
         try:
             r = requests.post(
                 f"{self.base_url}/free",
-                json={"unload_models": True, "free_memory": True},
-                timeout=5,
+                json={"unload_models": unload_models, "free_memory": True},
+                timeout=30,
             )
             return r.status_code == 200
         except Exception:

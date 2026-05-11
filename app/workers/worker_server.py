@@ -13,6 +13,7 @@ class LLMRequest(BaseModel):
     place_ko: str
     characters_ko: str
     topic_ko: str
+    seed: int | None = None
 
 
 class ImageRequest(BaseModel):
@@ -39,7 +40,7 @@ async def llm_generate(req: LLMRequest):
     loop = asyncio.get_event_loop()
     from app.services.story_service import generate_story
     story = await loop.run_in_executor(
-        None, generate_story, req.era_ko, req.place_ko, req.characters_ko, req.topic_ko
+        None, generate_story, req.era_ko, req.place_ko, req.characters_ko, req.topic_ko, req.seed
     )
     return story.model_dump()
 
@@ -84,13 +85,16 @@ def _generate_image_bytes(prompt: str, seed: int, stem: str) -> bytes:
     from app.clients.comfyui_client import ComfyUIClient, generate_image_bytes
     from app.core.config import settings
     client = ComfyUIClient()
-    return generate_image_bytes(
-        prompt=prompt,
-        seed=seed,
-        stem=stem,
-        workflow_path=settings.workflow_path,
-        client=client,
-    )
+    try:
+        return generate_image_bytes(
+            prompt=prompt,
+            seed=seed,
+            stem=stem,
+            workflow_path=settings.workflow_path,
+            client=client,
+        )
+    finally:
+        client.free_memory(unload_models=False)
 
 
 def _generate_tts_bytes(req: TTSRequest) -> bytes:
