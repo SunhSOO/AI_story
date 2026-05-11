@@ -53,7 +53,7 @@ def generate_story(era: str, place: str, characters: str, topic: str) -> StorySc
                 last_error = LLMError(str(e))
 
         print(f"[RETRY] Attempt {attempt + 1} failed: {last_error}")
-        retry_hint = "REMINDER: Output ONLY the JSON object. scenes array must have exactly 4 items. emotion must be one of: 행복, 슬픔, 화남, 밝음, 긴장, 무서움.\n"
+        retry_hint = "REMINDER: Output ONLY the JSON object. scenes array must have exactly 4 items. dialogue_emotion must be one of: 기쁨, 슬픔, 무서움.\n"
         current_prompt = retry_hint + prompt
 
     raise LLMError(f"Story generation failed after {settings.llm_max_retries} retries: {last_error}")

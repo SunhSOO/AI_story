@@ -22,8 +22,8 @@ User inputs:
 | 값 | TTS 스타일 |
 | --- | --- |
 | 기쁨 | joyful bright tone |
-| 슬픔 | sad emotional voice |
-| 무서움 | fearful trembling voice |
+| 슬픔 | sad emotional tone |
+| 무서움 | fearful trembling tone |
 
 ### 언어 규칙
 - "title" (동화 전체 제목): 한국어
