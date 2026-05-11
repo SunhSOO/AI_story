@@ -4,7 +4,14 @@
       "Bash(python -c ' *)",
       "Bash(grep -v -E \"^\\(app|ComfyUI|llama\\\\.cpp|llm_model|voxcpm2TTS|outputs|static|\\\\.git\\)$\")",
       "PowerShell(head -50)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\sunhy\\\\Desktop\\\\AI_story\" -Recurse -Name)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\sunhy\\\\Desktop\\\\AI_story\" -Recurse -Name)",
+      "Bash(ipconfig)",
+      "Bash(git stash *)",
+      "Bash(git pull *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git restore *)",
+      "Bash(dir \"c:\\\\Users\\\\user\\\\Desktop\\\\make_story\\\\voxcpm2TTS\")"
     ]
   }
 }

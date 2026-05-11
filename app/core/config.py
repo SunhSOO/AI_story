@@ -53,7 +53,7 @@ class Settings(BaseSettings):
 
     # voxcpm2 TTS
     voxcpm2_dir: Path = BASE_DIR / "voxcpm2TTS"
-    tts_reference_wav: Path = BASE_DIR / "voxcpm2TTS" / "reference_speaker.wav"
+    tts_reference_wav: Path = BASE_DIR / "voxcpm2TTS" / "reference_speaker.mp3"
     tts_cfg_value: float = 1.0
     tts_timesteps: int = 32
 
