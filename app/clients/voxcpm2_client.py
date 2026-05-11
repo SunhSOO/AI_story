@@ -13,6 +13,7 @@ from app.core.exceptions import TTSError
 _WHITESPACE_RE = re.compile(r"\s+")
 _BRACKETED_TTS_NOTE_RE = re.compile(r"[\(\[\{<（［｛【「『][^)\]\}>）］｝】」』]*[\)\]\}>）］｝】」』]")
 _ALLOWED_TTS_PUNCTUATION = {"!", "?", ","}
+_TTS_WARMUP_TEXT = "안녕하세요"
 
 
 def _is_tts_text_char(ch: str) -> bool:
@@ -39,6 +40,8 @@ def _clean_tts_text(text: str) -> str:
 # 항상 동일한 단일 스레드에서 실행해야 한다.
 _tts_executor: concurrent.futures.ThreadPoolExecutor | None = None
 _tts_executor_lock = threading.Lock()
+_tts_warmed_up = False
+_tts_warmup_lock = threading.Lock()
 
 
 def get_tts_executor() -> concurrent.futures.ThreadPoolExecutor:
@@ -55,13 +58,14 @@ def get_tts_executor() -> concurrent.futures.ThreadPoolExecutor:
 def unload_model() -> None:
     """TTS executor를 종료하고 VRAM에서 voxcpm2 모델을 해제."""
     import gc
-    global _tts_executor
+    global _tts_executor, _tts_warmed_up
 
     # executor 종료 — wait=True로 스레드가 완전히 종료될 때까지 대기
     with _tts_executor_lock:
         if _tts_executor is not None:
             _tts_executor.shutdown(wait=True)
             _tts_executor = None
+        _tts_warmed_up = False
 
     # model_loader 싱글톤(_model) 해제
     try:
@@ -113,18 +117,39 @@ def _get_model():
         raise TTSError(f"Cannot import voxcpm2 model_loader: {e}") from e
 
 
+def _run_model_generate(model, text: str, ref_wav: Path):
+    return model.generate(
+        text=text,
+        reference_wav_path=str(ref_wav),
+        cfg_value=settings.tts_cfg_value,
+        inference_timesteps=settings.tts_timesteps,
+    )
+
+
+def _warm_up_model(model, ref_wav: Path) -> None:
+    global _tts_warmed_up
+    if _tts_warmed_up:
+        return
+
+    with _tts_warmup_lock:
+        if _tts_warmed_up:
+            return
+        try:
+            _run_model_generate(model, _TTS_WARMUP_TEXT, ref_wav)
+        except Exception as e:
+            raise TTSError(f"voxcpm2 warmup failed: {e}") from e
+        _tts_warmed_up = True
+        print("[TTS] voxcpm2 warmup done")
+
+
 def _generate_wav(text: str, emotion: str | None, ref_wav: Path):
     """Internal: run model.generate and return (wav_array, sample_rate)."""
     tts_text = _clean_tts_text(text)
 
     model = _get_model()
+    _warm_up_model(model, ref_wav)
     try:
-        wav = model.generate(
-            text=tts_text,
-            reference_wav_path=str(ref_wav),
-            cfg_value=settings.tts_cfg_value,
-            inference_timesteps=settings.tts_timesteps,
-        )
+        wav = _run_model_generate(model, tts_text, ref_wav)
     except Exception as e:
         raise TTSError(f"voxcpm2 generation failed: {e}") from e
 

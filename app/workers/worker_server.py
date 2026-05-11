@@ -54,7 +54,8 @@ async def image_generate(req: ImageRequest):
 @app.post("/tts/generate")
 async def tts_generate(req: TTSRequest):
     loop = asyncio.get_event_loop()
-    wav_bytes = await loop.run_in_executor(None, _generate_tts_bytes, req)
+    from app.clients.voxcpm2_client import get_tts_executor
+    wav_bytes = await loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req)
     return Response(content=wav_bytes, media_type="audio/wav")
 
 
@@ -94,9 +95,8 @@ def _generate_image_bytes(prompt: str, seed: int, stem: str) -> bytes:
 
 def _generate_tts_bytes(req: TTSRequest) -> bytes:
     import tempfile
-    import numpy as np
     from pathlib import Path
-    from app.clients.voxcpm2_client import get_tts_executor, synthesize, synthesize_narration_dialogue
+    from app.clients.voxcpm2_client import synthesize, synthesize_narration_dialogue
 
     with tempfile.TemporaryDirectory() as tmpdir:
         audio_dir = Path(tmpdir) / "audio"
