@@ -5,7 +5,7 @@ from app.schemas.story_schema import StorySchema
 
 _LLM_TIMEOUT = aiohttp.ClientTimeout(total=900)
 _IMG_TIMEOUT = aiohttp.ClientTimeout(total=300)
-_TTS_TIMEOUT = aiohttp.ClientTimeout(total=300)
+_TTS_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=1800)
 _CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 
@@ -54,6 +54,7 @@ class WorkerClient:
         dialogue_emotion: str,
     ) -> bytes:
         try:
+            print(f"[MASTER TTS HTTP] request scene={scene_no}")
             async with aiohttp.ClientSession(timeout=_TTS_TIMEOUT) as session:
                 async with session.post(
                     f"{self.base_url}/tts/generate",
@@ -70,7 +71,9 @@ class WorkerClient:
                         raise RuntimeError(
                             f"Worker TTS HTTP {resp.status} scene={scene_no}: {body[:500]}"
                         )
-                    return await resp.read()
+                    data = await resp.read()
+                    print(f"[MASTER TTS HTTP] response scene={scene_no} bytes={len(data)}")
+                    return data
         except Exception as exc:
             raise RuntimeError(
                 f"Worker TTS request failed scene={scene_no}: {type(exc).__name__}: {exc!r}"

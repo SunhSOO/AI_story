@@ -61,6 +61,7 @@ async def tts_generate(req: TTSRequest):
     from app.clients.voxcpm2_client import get_tts_executor
     try:
         wav_bytes = await loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req)
+        print(f"[WORKER TTS] response scene={req.scene_no} bytes={len(wav_bytes)}")
         return Response(content=wav_bytes, media_type="audio/wav")
     except Exception as exc:
         import traceback
@@ -130,8 +131,9 @@ def _generate_tts_bytes(req: TTSRequest) -> bytes:
         else:
             synthesize(text=req.narration, emotion=None, output_path=output_path)
 
-        print(f"[WORKER TTS] done scene={req.scene_no}")
-        return output_path.read_bytes()
+        wav_bytes = output_path.read_bytes()
+        print(f"[WORKER TTS] done scene={req.scene_no} bytes={len(wav_bytes)}")
+        return wav_bytes
 
 
 def _free_comfyui() -> None:
