@@ -2,9 +2,9 @@
 
 const API = window.location.origin;
 const SCENE_COUNT = 4;
-const PANEL_COUNT = 3;
+const PANEL_COUNT = 2;
 const STORY_UNITS = 5;
-const IMAGE_UNITS = 13;
+const IMAGE_UNITS = 9;
 const AUDIO_UNITS = 5;
 const TOTAL_UNITS = STORY_UNITS + IMAGE_UNITS + AUDIO_UNITS;
 
@@ -280,9 +280,9 @@ function renderScenes(scenes) {
     const scene = scenes.find((item) => item.scene_no === sceneNo) || {};
     const scenarios = scene.scenarios || [];
 
-    // index 1: 내레이션 텍스트 + 오디오, index 4: 대사 텍스트
+    // index 1: 내레이션 텍스트 + 오디오, index 3: 대사 텍스트
     const narrationStep = scenarios.find((s) => s.index === 1) || {};
-    const dialogueStep = scenarios.find((s) => s.index === 4) || {};
+    const dialogueStep = scenarios.find((s) => s.index === 3) || {};
     const narration = narrationStep.msg || '';
     const dialogue = dialogueStep.msg || '';
     const audioUrl = narrationStep.audio_url || '';
@@ -313,11 +313,10 @@ function renderScenes(scenes) {
 
 function getSceneSlots(scene) {
   const scenarios = scene?.scenarios || [];
-  // index 0 → img_01, index 2 → img_02, index 3 → img_03
+  // index 0 → img_01, index 2 → img_02
   return [
     (scenarios.find((s) => s.index === 0) || {}).image_url || '',
     (scenarios.find((s) => s.index === 2) || {}).image_url || '',
-    (scenarios.find((s) => s.index === 3) || {}).image_url || '',
   ];
 }
 

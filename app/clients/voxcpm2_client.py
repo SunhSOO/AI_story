@@ -13,6 +13,9 @@ from app.core.exceptions import TTSError
 _WHITESPACE_RE = re.compile(r"\s+")
 _BRACKETED_TTS_NOTE_RE = re.compile(r"[\(\[\{<（［｛【「『][^)\]\}>）］｝】」』]*[\)\]\}>）］｝】」』]")
 _ALLOWED_TTS_PUNCTUATION = {"!", "?", ","}
+_PEAK_CEILING = 0.95
+_TARGET_RMS = 10 ** (-20 / 20)
+_WAV_EPSILON = 1e-8
 _TTS_WARMUP_TEXT = "안녕하세요"
 
 
@@ -34,6 +37,35 @@ def _clean_tts_text(text: str) -> str:
     text = _BRACKETED_TTS_NOTE_RE.sub(" ", text)
     cleaned = "".join(ch for ch in text if _is_tts_text_char(ch))
     return _WHITESPACE_RE.sub(" ", cleaned).strip()
+
+
+def _normalize_wav(wav) -> np.ndarray:
+    audio = np.asarray(wav, dtype=np.float32)
+    if audio.size == 0:
+        return audio
+
+    audio = np.nan_to_num(audio, nan=0.0, posinf=0.0, neginf=0.0)
+    peak = float(np.max(np.abs(audio)))
+    if peak < _WAV_EPSILON:
+        return audio
+
+    rms = float(np.sqrt(np.mean(np.square(audio))))
+    gain = (_TARGET_RMS / rms) if rms > _WAV_EPSILON else 1.0
+    if peak * gain > _PEAK_CEILING:
+        gain = _PEAK_CEILING / peak
+
+    audio = audio * gain
+    return np.clip(audio, -_PEAK_CEILING, _PEAK_CEILING)
+
+
+def _write_wav(output_path: Path, wav, sample_rate: int) -> None:
+    try:
+        import soundfile as sf
+    except ImportError as e:
+        raise TTSError(f"soundfile not installed: {e}") from e
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(str(output_path), _normalize_wav(wav), sample_rate)
 
 
 # TTS는 torch.compile + CUDA graph가 스레드 TLS에 바인딩되므로
@@ -163,18 +195,12 @@ def synthesize(
     reference_wav: Path | None = None,
 ) -> None:
     """Synthesize a single text segment and save to output_path."""
-    try:
-        import soundfile as sf
-    except ImportError as e:
-        raise TTSError(f"soundfile not installed: {e}") from e
-
     ref_wav = reference_wav or settings.tts_reference_wav
     if not ref_wav.exists():
         raise TTSError(f"TTS reference WAV not found: {ref_wav}")
 
     wav, sr = _generate_wav(text, emotion, ref_wav)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    sf.write(str(output_path), wav, sr)
+    _write_wav(output_path, wav, sr)
 
 
 def synthesize_narration_dialogue(
@@ -185,21 +211,11 @@ def synthesize_narration_dialogue(
     output_path: Path,
     reference_wav: Path | None = None,
 ) -> None:
-    """Synthesize narration + dialogue, concatenate with 0.5 s silence, and save."""
-    try:
-        import soundfile as sf
-    except ImportError as e:
-        raise TTSError(f"soundfile not installed: {e}") from e
-
+    """Synthesize narration + dialogue in one pass and save."""
     ref_wav = reference_wav or settings.tts_reference_wav
     if not ref_wav.exists():
         raise TTSError(f"TTS reference WAV not found: {ref_wav}")
 
-    narration_wav, sr = _generate_wav(narration, emotion=narration_emotion, ref_wav=ref_wav)
-    dialogue_wav, _  = _generate_wav(dialogue, emotion=dialogue_emotion, ref_wav=ref_wav)
-
-    silence = np.zeros(int(sr * 0.5), dtype=narration_wav.dtype)
-    combined = np.concatenate([narration_wav, silence, dialogue_wav])
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    sf.write(str(output_path), combined, sr)
+    combined_text = f"{narration}, {dialogue}" if dialogue else narration
+    wav, sr = _generate_wav(combined_text, emotion=None, ref_wav=ref_wav)
+    _write_wav(output_path, wav, sr)
