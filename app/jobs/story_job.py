@@ -166,10 +166,13 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                     "dialogue_emotion": "",
                 })
 
-            # 배치 TTS 실행 (완료 후 서버측에서 자동으로 TTS 모델 언로드 + VRAM 해제)
-            # 결과 키 형식: "scene_no_0" (narration), "scene_no_1" (dialogue)
-            tts_results = await worker.generate_tts_batch(tts_items)
-            print(f"[WORKER] TTS batch done in {time.time() - tts_started_at:.1f}s")
+            # 배치 TTS 실행 — 실패해도 이미지 생성은 계속 진행
+            tts_results: dict[str, bytes] = {}
+            try:
+                tts_results = await worker.generate_tts_batch(tts_items)
+                print(f"[WORKER] TTS batch done in {time.time() - tts_started_at:.1f}s")
+            except Exception as tts_exc:
+                print(f"[WORKER] TTS batch failed (non-fatal, continuing to images): {tts_exc!r}")
 
             # ── Cover audio (0_0) ──
             cover_key = "0_0"
