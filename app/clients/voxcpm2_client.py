@@ -12,7 +12,7 @@ from app.core.exceptions import TTSError
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _BRACKETED_TTS_NOTE_RE = re.compile(r"[\(\[\{<（［｛【「『][^)\]\}>）］｝】」』]*[\)\]\}>）］｝】」』]")
-_ALLOWED_TTS_PUNCTUATION = {"!", "?", ","}
+_ALLOWED_TTS_PUNCTUATION = {"?"}
 _PEAK_CEILING = 0.95
 _TARGET_RMS = 10 ** (-20 / 20)
 _WAV_EPSILON = 1e-8
@@ -37,6 +37,11 @@ def _clean_tts_text(text: str) -> str:
     text = _BRACKETED_TTS_NOTE_RE.sub(" ", text)
     cleaned = "".join(ch for ch in text if _is_tts_text_char(ch))
     return _WHITESPACE_RE.sub(" ", cleaned).strip()
+
+
+def _join_clean_tts_text(*parts: str) -> str:
+    cleaned_parts = [_clean_tts_text(part) for part in parts if part]
+    return _WHITESPACE_RE.sub(" ", " ".join(part for part in cleaned_parts if part)).strip()
 
 
 def _normalize_wav(wav) -> np.ndarray:
@@ -177,6 +182,8 @@ def _warm_up_model(model, ref_wav: Path) -> None:
 def _generate_wav(text: str, emotion: str | None, ref_wav: Path):
     """Internal: run model.generate and return (wav_array, sample_rate)."""
     tts_text = _clean_tts_text(text)
+    if not tts_text:
+        raise TTSError("TTS text is empty after sanitization")
 
     model = _get_model()
     _warm_up_model(model, ref_wav)
@@ -211,26 +218,11 @@ def synthesize_narration_dialogue(
     output_path: Path,
     reference_wav: Path | None = None,
 ) -> None:
-    """Synthesize narration and dialogue separately, then save one WAV."""
+    """Clean and join narration/dialogue, then synthesize one scene WAV."""
     ref_wav = reference_wav or settings.tts_reference_wav
     if not ref_wav.exists():
         raise TTSError(f"TTS reference WAV not found: {ref_wav}")
 
-    narration_wav, sr = _generate_wav(narration, emotion=None, ref_wav=ref_wav)
-    if not dialogue:
-        _write_wav(output_path, narration_wav, sr)
-        return
-
-    dialogue_wav, dialogue_sr = _generate_wav(dialogue, emotion=None, ref_wav=ref_wav)
-    if dialogue_sr != sr:
-        raise TTSError(f"TTS sample rate mismatch: narration={sr}, dialogue={dialogue_sr}")
-
-    silence = np.zeros(int(sr * 0.5), dtype=np.float32)
-    wav = np.concatenate(
-        [
-            np.asarray(narration_wav, dtype=np.float32),
-            silence,
-            np.asarray(dialogue_wav, dtype=np.float32),
-        ]
-    )
+    scene_text = _join_clean_tts_text(narration, dialogue)
+    wav, sr = _generate_wav(scene_text, emotion=None, ref_wav=ref_wav)
     _write_wav(output_path, wav, sr)

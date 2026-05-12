@@ -20,7 +20,7 @@ def _resolve_llama_cli() -> Path:
 
 
 def _resolve_gguf_model() -> Path:
-    preferred = BASE_DIR / "llm_model" / "Qwen3.5-9B-Q8_0.gguf"
+    preferred = BASE_DIR / "llm_model" / "Qwen3-14B-Q8_0.gguf"
     if preferred.is_file():
         return preferred
     model_dir = BASE_DIR / "llm_model"
