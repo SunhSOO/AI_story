@@ -95,11 +95,15 @@ def get_tts_executor() -> concurrent.futures.ThreadPoolExecutor:
 def reset_tts_executor() -> None:
     """hang된 TTS 스레드를 버리고 새 executor를 생성."""
     global _tts_executor, _tts_warmed_up
+    old_executor = None
     with _tts_executor_lock:
+        old_executor = _tts_executor
         _tts_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="tts-worker"
         )
         _tts_warmed_up = False
+    if old_executor is not None:
+        old_executor.shutdown(wait=False, cancel_futures=True)
     print("[TTS] executor reset (previous thread abandoned)")
 
 
@@ -119,8 +123,14 @@ def unload_model() -> None:
     try:
         ml = sys.modules.get('model_loader')
         if ml is not None and getattr(ml, '_model', None) is not None:
-            del ml._model
+            model = ml._model
+            try:
+                if hasattr(model, "to"):
+                    model.to("cpu")
+            except Exception as e:
+                print(f"[TTS] model move to CPU skipped: {e}")
             ml._model = None
+            del model
             print("[TTS] voxcpm2 model unloaded from VRAM")
     except Exception as e:
         print(f"[TTS] model unload: {e}")
@@ -130,7 +140,10 @@ def unload_model() -> None:
         gc.collect()
         import torch
         if torch.cuda.is_available():
+            torch.cuda.synchronize()
             torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+            torch.cuda.reset_peak_memory_stats()
             print("[TTS] CUDA cache cleared")
     except Exception as e:
         print(f"[TTS] CUDA cleanup: {e}")

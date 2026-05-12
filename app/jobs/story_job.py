@@ -137,6 +137,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
         # Branch A (5080 Worker): all TTS plus assigned images
         async def _worker_branch():
             print("[WORKER] TTS cover on 5080...")
+            tts_started_at = time.time()
             cover_audio_bytes = await worker.generate_cover_tts(story.title)
             cover_audio = "cover.wav"
             cover_audio_path = run_dir / "audio" / cover_audio
@@ -155,6 +156,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
             for scene in story.scenes:
                 scene_no = scene.scene_no
                 print(f"[WORKER] TTS scene {scene_no} on 5080...")
+                scene_tts_started_at = time.time()
                 wav_bytes = await worker.generate_tts(
                     scene_no=scene_no,
                     narration=scene.narration,
@@ -176,11 +178,13 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                         "audio_url": f"/api/runs/{run_state.run_id}/audio/{filename}",
                     },
                 )
-                print(f"[WORKER] TTS scene {scene_no} done")
+                print(f"[WORKER] TTS scene {scene_no} done in {time.time() - scene_tts_started_at:.1f}s")
 
             # TTS 모델 언로드 → ComfyUI VRAM 확보
+            print(f"[WORKER] all TTS done in {time.time() - tts_started_at:.1f}s")
+            unload_started_at = time.time()
             await worker.unload_tts()
-            print("[WORKER] TTS model unloaded")
+            print(f"[WORKER] TTS model unloaded in {time.time() - unload_started_at:.1f}s")
 
             # 씬별 이미지
             for scene_no, img_idxs in _WORKER_IMAGES.items():

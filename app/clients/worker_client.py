@@ -6,7 +6,7 @@ from app.schemas.story_schema import StorySchema
 _LLM_TIMEOUT = aiohttp.ClientTimeout(total=900)
 _IMG_TIMEOUT = aiohttp.ClientTimeout(total=300)
 _TTS_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=720)
-_CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=120)
+_CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=300)
 
 
 class WorkerClient:
@@ -97,12 +97,12 @@ class WorkerClient:
             print(f"[WORKER COMFYUI FREE] {e}")
 
     async def unload_tts(self) -> None:
-        try:
-            async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:
-                async with session.post(f"{self.base_url}/tts/unload") as resp:
-                    resp.raise_for_status()
-        except Exception as e:
-            print(f"[WORKER TTS UNLOAD] {e}")
+        async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:
+            async with session.post(f"{self.base_url}/tts/unload") as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    raise RuntimeError(f"Worker TTS unload HTTP {resp.status}: {body[:500]}")
+                print("[WORKER TTS UNLOAD] ok")
 
     async def cleanup(self) -> None:
         try:

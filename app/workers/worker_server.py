@@ -162,17 +162,23 @@ def _free_comfyui() -> None:
 
 
 def _unload_tts() -> None:
+    import gc
+    from app.clients.voxcpm2_client import unload_model
+
+    unload_model()
+    gc.collect()
+
     try:
-        import gc
-        from app.clients.voxcpm2_client import unload_model
-        unload_model()
-        gc.collect()
         import torch
         if torch.cuda.is_available():
+            torch.cuda.synchronize()
             torch.cuda.empty_cache()
-        print("[WORKER] TTS model unloaded from VRAM")
+            torch.cuda.ipc_collect()
+            torch.cuda.reset_peak_memory_stats()
     except Exception as e:
-        print(f"[CLEANUP] TTS unload: {e}")
+        raise RuntimeError(f"TTS CUDA cleanup failed: {e}") from e
+
+    print("[WORKER] TTS model unloaded from VRAM")
 
 
 def _cleanup_llm() -> None:
