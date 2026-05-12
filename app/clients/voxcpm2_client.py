@@ -211,11 +211,26 @@ def synthesize_narration_dialogue(
     output_path: Path,
     reference_wav: Path | None = None,
 ) -> None:
-    """Synthesize narration + dialogue in one pass and save."""
+    """Synthesize narration and dialogue separately, then save one WAV."""
     ref_wav = reference_wav or settings.tts_reference_wav
     if not ref_wav.exists():
         raise TTSError(f"TTS reference WAV not found: {ref_wav}")
 
-    combined_text = f"{narration}, {dialogue}" if dialogue else narration
-    wav, sr = _generate_wav(combined_text, emotion=None, ref_wav=ref_wav)
+    narration_wav, sr = _generate_wav(narration, emotion=None, ref_wav=ref_wav)
+    if not dialogue:
+        _write_wav(output_path, narration_wav, sr)
+        return
+
+    dialogue_wav, dialogue_sr = _generate_wav(dialogue, emotion=None, ref_wav=ref_wav)
+    if dialogue_sr != sr:
+        raise TTSError(f"TTS sample rate mismatch: narration={sr}, dialogue={dialogue_sr}")
+
+    silence = np.zeros(int(sr * 0.5), dtype=np.float32)
+    wav = np.concatenate(
+        [
+            np.asarray(narration_wav, dtype=np.float32),
+            silence,
+            np.asarray(dialogue_wav, dtype=np.float32),
+        ]
+    )
     _write_wav(output_path, wav, sr)

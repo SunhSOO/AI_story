@@ -107,6 +107,7 @@ def _generate_tts_bytes(req: TTSRequest) -> bytes:
         audio_dir.mkdir()
         output_path = audio_dir / f"scene_{req.scene_no:02d}.wav"
 
+        print(f"[WORKER TTS] start scene={req.scene_no}")
         if req.dialogue:
             synthesize_narration_dialogue(
                 narration=req.narration,
@@ -118,6 +119,7 @@ def _generate_tts_bytes(req: TTSRequest) -> bytes:
         else:
             synthesize(text=req.narration, emotion=None, output_path=output_path)
 
+        print(f"[WORKER TTS] done scene={req.scene_no}")
         return output_path.read_bytes()
 
 
