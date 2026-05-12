@@ -57,6 +57,19 @@ async def image_generate(req: ImageRequest):
 
 _TTS_SCENE_TIMEOUT = 660
 
+
+async def _maybe_unload_tts_after_request(scene_no: int) -> None:
+    from app.core.config import settings
+
+    if not settings.tts_unload_after_each_request:
+        return
+
+    loop = asyncio.get_event_loop()
+    print(f"[WORKER TTS] unload after scene={scene_no} start")
+    await loop.run_in_executor(None, _unload_tts)
+    print(f"[WORKER TTS] unload after scene={scene_no} done")
+
+
 @app.post("/tts/generate")
 async def tts_generate(req: TTSRequest):
     loop = asyncio.get_event_loop()
@@ -66,10 +79,15 @@ async def tts_generate(req: TTSRequest):
             loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req),
             timeout=_TTS_SCENE_TIMEOUT,
         )
+        await _maybe_unload_tts_after_request(req.scene_no)
         print(f"[WORKER TTS] response scene={req.scene_no} bytes={len(wav_bytes)}")
         return Response(content=wav_bytes, media_type="audio/wav")
     except asyncio.TimeoutError:
         reset_tts_executor()
+        try:
+            await _maybe_unload_tts_after_request(req.scene_no)
+        except Exception as cleanup_exc:
+            print(f"[WORKER TTS] unload after timeout failed: {cleanup_exc}")
         raise HTTPException(
             status_code=500,
             detail=f"TTS scene={req.scene_no} timed out after {_TTS_SCENE_TIMEOUT}s",
@@ -77,6 +95,10 @@ async def tts_generate(req: TTSRequest):
     except Exception as exc:
         import traceback
         traceback.print_exc()
+        try:
+            await _maybe_unload_tts_after_request(req.scene_no)
+        except Exception as cleanup_exc:
+            print(f"[WORKER TTS] unload after failure failed: {cleanup_exc}")
         raise HTTPException(
             status_code=500,
             detail=f"TTS scene={req.scene_no} failed: {type(exc).__name__}: {exc}",
