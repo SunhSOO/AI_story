@@ -3,6 +3,7 @@ import re
 import sys
 import threading
 import concurrent.futures
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -79,6 +80,47 @@ _tts_executor: concurrent.futures.ThreadPoolExecutor | None = None
 _tts_executor_lock = threading.Lock()
 _tts_warmed_up = False
 _tts_warmup_lock = threading.Lock()
+
+
+def _format_bytes(value: int) -> str:
+    return f"{value / (1024 ** 3):.2f}GB"
+
+
+def _log_cuda_memory(label: str) -> None:
+    if not settings.tts_vram_log_enabled:
+        return
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return
+        allocated = torch.cuda.memory_allocated()
+        reserved = torch.cuda.memory_reserved()
+        peak = torch.cuda.max_memory_allocated()
+        print(
+            f"[TTS VRAM] {label} "
+            f"allocated={_format_bytes(allocated)} "
+            f"reserved={_format_bytes(reserved)} "
+            f"peak={_format_bytes(peak)}"
+        )
+    except Exception as e:
+        print(f"[TTS VRAM] {label} unavailable: {e}")
+
+
+def _cleanup_after_tts(label: str) -> None:
+    gc.collect()
+    if not settings.tts_cleanup_each_scene:
+        _log_cuda_memory(f"{label} no-cleanup")
+        return
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+            torch.cuda.reset_peak_memory_stats()
+    except Exception as e:
+        print(f"[TTS] post-scene cleanup failed: {e}")
+    _log_cuda_memory(f"{label} cleanup")
 
 
 def get_tts_executor() -> concurrent.futures.ThreadPoolExecutor:
@@ -179,12 +221,22 @@ def _get_model():
 
 
 def _run_model_generate(model, text: str, ref_wav: Path):
-    return model.generate(
-        text=text,
-        reference_wav_path=str(ref_wav),
-        cfg_value=settings.tts_cfg_value,
-        inference_timesteps=settings.tts_timesteps,
-    )
+    try:
+        import torch
+        with torch.inference_mode():
+            return model.generate(
+                text=text,
+                reference_wav_path=str(ref_wav),
+                cfg_value=settings.tts_cfg_value,
+                inference_timesteps=settings.tts_timesteps,
+            )
+    except ImportError:
+        return model.generate(
+            text=text,
+            reference_wav_path=str(ref_wav),
+            cfg_value=settings.tts_cfg_value,
+            inference_timesteps=settings.tts_timesteps,
+        )
 
 
 def _warm_up_model(model, ref_wav: Path) -> None:
@@ -214,10 +266,12 @@ def _generate_wav(text: str, emotion: str | None, ref_wav: Path):
         _warm_up_model(model, ref_wav)
 
     print(f"[TTS] generate chars={len(tts_text)} preview={tts_text[:80]}")
+    _log_cuda_memory("before-generate")
     try:
         wav = _run_model_generate(model, tts_text, ref_wav)
     except Exception as e:
         raise TTSError(f"voxcpm2 generation failed: {e}") from e
+    _log_cuda_memory("after-generate")
 
     return wav, model.tts_model.sample_rate
 
@@ -233,8 +287,13 @@ def synthesize(
     if not ref_wav.exists():
         raise TTSError(f"TTS reference WAV not found: {ref_wav}")
 
-    wav, sr = _generate_wav(text, emotion, ref_wav)
-    _write_wav(output_path, wav, sr)
+    wav = None
+    try:
+        wav, sr = _generate_wav(text, emotion, ref_wav)
+        _write_wav(output_path, wav, sr)
+    finally:
+        del wav
+        _cleanup_after_tts(f"single {output_path.name}")
 
 
 def synthesize_narration_dialogue(
@@ -257,5 +316,10 @@ def synthesize_narration_dialogue(
         f"dialogue_chars={len(_clean_tts_text(dialogue))} "
         f"total_chars={len(scene_text)}"
     )
-    wav, sr = _generate_wav(scene_text, emotion=None, ref_wav=ref_wav)
-    _write_wav(output_path, wav, sr)
+    wav = None
+    try:
+        wav, sr = _generate_wav(scene_text, emotion=None, ref_wav=ref_wav)
+        _write_wav(output_path, wav, sr)
+    finally:
+        del wav
+        _cleanup_after_tts(f"scene {output_path.name}")
