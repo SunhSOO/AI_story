@@ -54,6 +54,28 @@ button {
   text-transform: uppercase;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.api-docs-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: #667085;
+  text-decoration: none;
+  padding: 4px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  transition: color .15s, border-color .15s;
+}
+
+.api-docs-link:hover {
+  color: #344054;
+  border-color: #98a2b3;
+}
+
 .connection-pill,
 .resource-pill,
 .pipeline strong {

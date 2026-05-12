@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Story Generator — API 명세서</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3347;
+      --text: #e2e6f0;
+      --text-muted: #7a819a;
+      --accent: #5b8dee;
+      --accent2: #a78bfa;
+      --green: #34d399;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --orange: #fb923c;
+      --radius: 8px;
+      --font-mono: 'Consolas', 'Menlo', 'Monaco', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Layout */
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 16px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .sidebar-version {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+
+    .sidebar a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 5px 10px;
+      border-radius: 5px;
+      transition: color .15s, background .15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar a:hover, .sidebar a.active { color: var(--text); background: var(--surface2); }
+
+    .sidebar .nav-group { margin-top: 14px; }
+    .sidebar .nav-group-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-muted);
+      padding: 0 10px;
+      margin-bottom: 4px;
+    }
+
+    .content {
+      flex: 1;
+      max-width: 860px;
+      padding: 40px 48px;
+      overflow-x: auto;
+    }
+
+    /* Typography */
+    h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+    h2 { font-size: 20px; font-weight: 600; margin: 40px 0 16px; padding-top: 40px; border-top: 1px solid var(--border); }
+    h2:first-of-type { border-top: none; margin-top: 28px; }
+    h3 { font-size: 15px; font-weight: 600; margin: 24px 0 10px; color: var(--accent); }
+    p { margin: 8px 0; color: #c5cae0; }
+    strong { color: var(--text); }
+
+    .page-meta { color: var(--text-muted); font-size: 13px; margin-bottom: 28px; }
+    .page-meta span + span::before { content: '·'; margin: 0 8px; }
+
+    /* Method badges */
+    .method {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: .04em;
+      min-width: 48px;
+      text-align: center;
+    }
+    .method.get    { background: rgba(52,211,153,.15); color: #34d399; }
+    .method.post   { background: rgba(251,191,36,.15);  color: #fbbf24; }
+    .method.delete { background: rgba(248,113,113,.15); color: #f87171; }
+
+    .endpoint-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 8px;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--surface);
+      transition: border-color .15s;
+    }
+    .endpoint-row:hover { border-color: var(--accent); }
+    .endpoint-row .path { font-family: var(--font-mono); font-size: 13px; flex: 1; }
+    .endpoint-row .desc { font-size: 12px; color: var(--text-muted); }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; margin: 16px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+    td code { font-family: var(--font-mono); font-size: 12px; color: var(--accent2); }
+    td .required { color: var(--red); font-size: 11px; font-weight: 600; }
+    td .optional { color: var(--text-muted); font-size: 11px; }
+
+    /* Code */
+    pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      overflow-x: auto;
+      margin: 12px 0;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+    code { font-family: var(--font-mono); font-size: 12.5px; color: var(--accent2); }
+    pre code { color: #c9d1e8; }
+
+    /* JSON syntax highlight */
+    .json-key    { color: #a78bfa; }
+    .json-str    { color: #6ee7b7; }
+    .json-num    { color: #fbbf24; }
+    .json-bool   { color: #fb923c; }
+    .json-null   { color: #7a819a; }
+    .json-comment{ color: #4b5563; font-style: italic; }
+
+    /* Status/stage pills */
+    .pill {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+    }
+    .pill.green  { background: rgba(52,211,153,.15); color: #34d399; }
+    .pill.yellow { background: rgba(251,191,36,.15);  color: #fbbf24; }
+    .pill.red    { background: rgba(248,113,113,.15); color: #f87171; }
+    .pill.blue   { background: rgba(91,141,238,.15);  color: #5b8dee; }
+    .pill.purple { background: rgba(167,139,250,.15); color: #a78bfa; }
+    .pill.muted  { background: rgba(122,129,154,.12); color: #7a819a; }
+
+    /* Callouts */
+    .callout {
+      display: flex;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      margin: 14px 0;
+      font-size: 13px;
+    }
+    .callout.info    { background: rgba(91,141,238,.1); border: 1px solid rgba(91,141,238,.25); }
+    .callout.warn    { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.25); }
+    .callout.tip     { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.25); }
+    .callout-icon    { font-size: 15px; flex-shrink: 0; }
+    .callout p       { margin: 0; }
+
+    /* Scenario index cards */
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .scenario-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+    .scenario-card .sc-index {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .scenario-card .sc-label {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .scenario-card .sc-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Audio/image diff highlight */
+    .changed { background: rgba(251,191,36,.08); }
+    .new-row  { background: rgba(52,211,153,.06); }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+
+    .anchor-link {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .anchor-link:hover { text-decoration: underline; }
+
+    /* Section ids for sidebar scroll */
+    .section-anchor { scroll-margin-top: 24px; }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">AI Story API</div>
+    <div class="sidebar-version">v3.0.0 &middot; 2026-05-12</div>
+    <nav>
+      <a href="#overview">개요</a>
+      <a href="#endpoints">엔드포인트 목록</a>
+
+      <div class="nav-group">
+        <div class="nav-group-label">기본</div>
+        <a href="#health">GET /health</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">STT</div>
+        <a href="#stt-field">POST /api/stt/field</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">Runs</div>
+        <a href="#create-run">POST /api/runs</a>
+        <a href="#get-run">GET /api/runs/{id}</a>
+        <a href="#events">GET …/events</a>
+        <a href="#story">GET …/story</a>
+        <a href="#images">GET …/images/{f}</a>
+        <a href="#audio">GET …/audio/{f}</a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-label">참고</div>
+        <a href="#schema">응답 스키마</a>
+        <a href="#flow">클라이언트 흐름</a>
+        <a href="#curl">curl 예시</a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <main class="content">
+
+    <!-- Header -->
+    <h1>AI Story Generator API 명세서</h1>
+    <div class="page-meta">
+      <span>v3.0.0</span>
+      <span>2026-05-12</span>
+      <span>FastAPI 3.0</span>
+    </div>
+
+    <div id="overview" class="section-anchor"></div>
+    <h2>개요</h2>
+
+    <div class="table-wrap">
+      <table>
+        <tr><th>항목</th><th>값</th></tr>
+        <tr><td>로컬 URL</td><td><code>http://127.0.0.1:8000</code></td></tr>
+        <tr><td>외부 URL</td><td><code>https://mystorybook.loca.lt</code></td></tr>
+        <tr><td>Swagger UI</td><td><code>http://127.0.0.1:8000/docs</code></td></tr>
+        <tr><td>응답 포맷</td><td>JSON · SSE · PNG · WAV</td></tr>
+        <tr><td>인증</td><td>없음</td></tr>
+        <tr><td>CORS</td><td>모든 Origin 허용</td></tr>
+      </table>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <p>Localtunnel 첫 접속 시 우회 페이지가 표시됩니다. URL에 <code>?bypass-tunnel-reminder=true</code>를 추가하거나 공인 IP <code>59.3.103.182</code>를 입력하세요.</p>
+    </div>
+
+    <h3>공통 에러 응답</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>코드</th><th>원인</th><th>예시</th></tr>
+        <tr><td><span class="pill red">404</span></td><td>리소스 없음</td><td><code>{"detail": "Run ... not found"}</code></td></tr>
+        <tr><td><span class="pill red">400</span></td><td>잘못된 파라미터</td><td><code>{"detail": "Invalid filename"}</code></td></tr>
+        <tr><td><span class="pill red">422</span></td><td>요청 필드 검증 실패</td><td><code>{"detail": [{"type":"missing",...}]}</code></td></tr>
+        <tr><td><span class="pill red">500</span></td><td>서버 처리 오류</td><td><code>{"detail": "STT failed: ..."}</code></td></tr>
+      </table>
+    </div>
+
+    <hr>
+
+    <!-- Endpoint summary -->
+    <div id="endpoints" class="section-anchor"></div>
+    <h2>엔드포인트 목록</h2>
+
+    <a class="endpoint-row" href="#health">
+      <span class="method get">GET</span>
+      <span class="path">/health</span>
+      <span class="desc">서버 상태 확인</span>
+    </a>
+    <a class="endpoint-row" href="#stt-field">
+      <span class="method post">POST</span>
+      <span class="path">/api/stt/field</span>
+      <span class="desc">음성 → 텍스트 변환 (Whisper STT)</span>
+    </a>
+    <a class="endpoint-row" href="#create-run">
+      <span class="method post">POST</span>
+      <span class="path">/api/runs</span>
+      <span class="desc">동화 생성 작업 시작</span>
+    </a>
+    <a class="endpoint-row" href="#get-run">
+      <span class="method get">GET</span>
+      <span class="path">/api/runs/{run_id}</span>
+      <span class="desc">작업 상태 및 결과물 URL 조회</span>
+    </a>
+    <a class="endpoint-row" href="#events">
+      <span class="method get">GET</span>
+      <span class="path">/api/runs/{run_id}/events</span>
+      <span class="desc">실시간 SSE 스트림</span>
+    </a>
+    <a class="endpoint-row" href="#story">
+      <span class="method get">GET</span>
+      <span class="path">/api/runs/{run_id}/story</span>
+      <span class="desc">원본 story.json 다운로드</span>
+    </a>
+    <a class="endpoint-row" href="#images">
+      <span class="method get">GET</span>
+      <span class="path">/api/runs/{run_id}/images/{filename}</span>
+      <span class="desc">생성 이미지 (PNG)</span>
+    </a>
+    <a class="endpoint-row" href="#audio">
+      <span class="method get">GET</span>
+      <span class="path">/api/runs/{run_id}/audio/{filename}</span>
+      <span class="desc">생성 오디오 (WAV)</span>
+    </a>
+
+    <hr>
+
+    <!-- GET /health -->
+    <div id="health" class="section-anchor"></div>
+    <h2><span class="method get">GET</span> /health</h2>
+    <p>서버 동작 여부를 확인합니다.</p>
+    <pre><code><span class="json-key">"status"</span>: <span class="json-str">"ok"</span></code></pre>
+
+    <hr>
+
+    <!-- POST /api/stt/field -->
+    <div id="stt-field" class="section-anchor"></div>
+    <h2><span class="method post">POST</span> /api/stt/field</h2>
+    <p>업로드한 음성 파일을 Whisper로 텍스트 변환합니다. 입력 폼의 각 필드에 음성 입력 기능을 구현할 때 사용합니다.</p>
+
+    <h3>Request — <code>multipart/form-data</code></h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>필드</th><th>타입</th><th></th><th>설명</th></tr>
+        <tr><td><code>audio_file</code></td><td>File</td><td><span class="required">필수</span></td><td>음성 파일. webm · mp4 · mp3 · wav 등</td></tr>
+        <tr><td><code>field_type</code></td><td>string</td><td><span class="required">필수</span></td><td><code>era</code> · <code>place</code> · <code>characters</code> · <code>topic</code> 중 하나</td></tr>
+        <tr><td><code>language</code></td><td>string</td><td><span class="optional">선택</span></td><td>언어 코드. 기본값 <code>ko-KR</code></td></tr>
+      </table>
+    </div>
+
+    <h3>Response — 200 OK</h3>
+    <pre><code>{
+  <span class="json-key">"stt_text"</span>:     <span class="json-str">"조선 시대"</span>,        <span class="json-comment">// Whisper 원문</span>
+  <span class="json-key">"parsed_value"</span>: <span class="json-str">"조선 시대"</span>,        <span class="json-comment">// 정규화된 값 (이 값을 사용하세요)</span>
+  <span class="json-key">"confidence"</span>:   <span class="json-num">0.91</span>               <span class="json-comment">// 0.0 ~ 1.0</span>
+}</code></pre>
+
+    <hr>
+
+    <!-- POST /api/runs -->
+    <div id="create-run" class="section-anchor"></div>
+    <h2><span class="method post">POST</span> /api/runs</h2>
+    <p>동화 생성 작업을 생성하고 백그라운드 파이프라인을 시작합니다.</p>
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ️</span>
+      <p><strong>파이프라인 구조</strong><br>
+        Stage 1 (LLM): 워커(RTX 5080)에서 story.json 생성<br>
+        Stage 2 (PARALLEL): 워커가 TTS 배치 + 씬 2·3 이미지, 마스터(RTX 3080 Ti)가 표지 + 씬 1·4 이미지 동시 생성
+      </p>
+    </div>
+
+    <h3>Request — <code>application/json</code></h3>
+    <pre><code>{
+  <span class="json-key">"era_ko"</span>:        <span class="json-str">"조선 시대"</span>,
+  <span class="json-key">"place_ko"</span>:      <span class="json-str">"한양의 작은 서당"</span>,
+  <span class="json-key">"characters_ko"</span>: <span class="json-str">"호기심 많은 아이와 말하는 호랑이"</span>,
+  <span class="json-key">"topic_ko"</span>:      <span class="json-str">"서로를 믿는 우정"</span>
+}</code></pre>
+
+    <h3>Response — 201 Created</h3>
+    <pre><code>{ <span class="json-key">"run_id"</span>: <span class="json-str">"20260429_173423_d118aa"</span> }</code></pre>
+    <p>이 <code>run_id</code>는 이후 모든 조회 API에서 사용합니다.</p>
+
+    <hr>
+
+    <!-- GET /api/runs/{id} -->
+    <div id="get-run" class="section-anchor"></div>
+    <h2><span class="method get">GET</span> /api/runs/{run_id}</h2>
+    <p>작업의 현재 상태와 생성된 결과물 URL을 반환합니다. 폴링 또는 SSE와 병행해 사용합니다.</p>
+
+    <h3>Response — 200 OK</h3>
+    <pre><code>{
+  <span class="json-key">"run_id"</span>:      <span class="json-str">"20260429_173423_d118aa"</span>,
+  <span class="json-key">"status"</span>:      <span class="json-str">"DONE"</span>,
+  <span class="json-key">"stage"</span>:       <span class="json-str">"IMAGE"</span>,
+  <span class="json-key">"story_title"</span>: <span class="json-str">"말하는 호랑이와 작은 약속"</span>,
+  <span class="json-key">"cover"</span>: {
+    <span class="json-key">"scene_no"</span>: <span class="json-num">0</span>,
+    <span class="json-key">"status"</span>:   <span class="json-str">"End"</span>,
+    <span class="json-key">"scenarios"</span>: [
+      { <span class="json-key">"index"</span>: <span class="json-num">0</span>, <span class="json-key">"image_url"</span>: <span class="json-str">"/api/runs/.../images/cover.png"</span>, <span class="json-key">"audio_url"</span>: <span class="json-str">""</span>, <span class="json-key">"msg"</span>: <span class="json-str">""</span>,  <span class="json-key">"delay"</span>: <span class="json-num">0</span> },
+      { <span class="json-key">"index"</span>: <span class="json-num">1</span>, <span class="json-key">"image_url"</span>: <span class="json-str">""</span>,                              <span class="json-key">"audio_url"</span>: <span class="json-str">"/api/runs/.../audio/cover.wav"</span>, <span class="json-key">"msg"</span>: <span class="json-str">"말하는 호랑이..."</span>, <span class="json-key">"delay"</span>: <span class="json-num">0</span> }
+    ]
+  },
+  <span class="json-key">"scenes"</span>: [
+    {
+      <span class="json-key">"scene_no"</span>: <span class="json-num">1</span>,
+      <span class="json-key">"status"</span>:   <span class="json-str">"End"</span>,
+      <span class="json-key">"scenarios"</span>: [
+        { <span class="json-key">"index"</span>: <span class="json-num">0</span>, <span class="json-key">"image_url"</span>: <span class="json-str">"/api/runs/.../images/scene_01_img_01.png"</span>, <span class="json-key">"audio_url"</span>: <span class="json-str">""</span>,                                  <span class="json-key">"msg"</span>: <span class="json-str">""</span>,          <span class="json-key">"delay"</span>: <span class="json-num">4</span> },
+        { <span class="json-key">"index"</span>: <span class="json-num">1</span>, <span class="json-key">"image_url"</span>: <span class="json-str">""</span>,                                      <span class="json-key">"audio_url"</span>: <span class="json-str">"/api/runs/.../audio/scene_01_0.wav"</span>, <span class="json-key">"msg"</span>: <span class="json-str">"서당 앞에..."</span>, <span class="json-key">"delay"</span>: <span class="json-num">0</span> },
+        { <span class="json-key">"index"</span>: <span class="json-num">2</span>, <span class="json-key">"image_url"</span>: <span class="json-str">"/api/runs/.../images/scene_01_img_02.png"</span>, <span class="json-key">"audio_url"</span>: <span class="json-str">""</span>,                                  <span class="json-key">"msg"</span>: <span class="json-str">""</span>,          <span class="json-key">"delay"</span>: <span class="json-num">4</span> },
+        { <span class="json-key">"index"</span>: <span class="json-num">3</span>, <span class="json-key">"image_url"</span>: <span class="json-str">""</span>,                                      <span class="json-key">"audio_url"</span>: <span class="json-str">"/api/runs/.../audio/scene_01_1.wav"</span>, <span class="json-key">"msg"</span>: <span class="json-str">"누가 남긴..."</span>, <span class="json-key">"delay"</span>: <span class="json-num">0</span> }
+      ]
+    }
+  ],
+  <span class="json-key">"error"</span>: <span class="json-null">null</span>
+}</code></pre>
+
+    <div id="schema" class="section-anchor"></div>
+    <h3>최상위 필드</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>필드</th><th>타입</th><th>설명</th></tr>
+        <tr><td><code>run_id</code></td><td>string</td><td>작업 ID</td></tr>
+        <tr><td><code>status</code></td><td>string</td><td><code>QUEUED</code> / <code>RUNNING</code> / <code>DONE</code> / <code>FAILED</code></td></tr>
+        <tr><td><code>stage</code></td><td>string</td><td><code>LLM</code> / <code>PARALLEL</code> / <code>IMAGE</code></td></tr>
+        <tr><td><code>story_title</code></td><td>string</td><td>동화 제목. LLM 완료 전 빈 문자열</td></tr>
+        <tr><td><code>cover</code></td><td>object</td><td>표지 정보. 항상 존재 (scenarios 2개)</td></tr>
+        <tr><td><code>scenes</code></td><td>array</td><td>씬 목록. LLM 완료 후 4개 고정</td></tr>
+        <tr><td><code>error</code></td><td>string|null</td><td>실패 시 에러 메시지</td></tr>
+      </table>
+    </div>
+
+    <h3>cover 구조</h3>
+    <p><code>cover</code>는 <code>SceneScenarioInfo</code> 타입이며 <strong>scenarios 2개</strong>만 포함합니다.</p>
+    <div class="scenario-grid">
+      <div class="scenario-card">
+        <div class="sc-index">cover · index 0</div>
+        <div class="sc-label">표지 이미지</div>
+        <div class="sc-desc"><code>image_url</code> = <code>cover.png</code></div>
+      </div>
+      <div class="scenario-card">
+        <div class="sc-index">cover · index 1</div>
+        <div class="sc-label">제목 낭독</div>
+        <div class="sc-desc"><code>msg</code> = 동화 제목<br><code>audio_url</code> = <code>cover.wav</code></div>
+      </div>
+    </div>
+
+    <h3>scenes[].scenarios 구조 (씬당 4개)</h3>
+    <div class="scenario-grid">
+      <div class="scenario-card">
+        <div class="sc-index">index 0</div>
+        <div class="sc-label">첫 번째 이미지</div>
+        <div class="sc-desc"><code>image_url</code> = <code>scene_NN_img_01.png</code><br><code>delay</code> = N초 대기</div>
+      </div>
+      <div class="scenario-card">
+        <div class="sc-index">index 1</div>
+        <div class="sc-label">내레이션</div>
+        <div class="sc-desc"><code>msg</code> = 내레이션 텍스트<br><code>audio_url</code> = <code>scene_NN_0.wav</code><br><code>delay: 0</code> = 오디오 완료까지 대기</div>
+      </div>
+      <div class="scenario-card">
+        <div class="sc-index">index 2</div>
+        <div class="sc-label">두 번째 이미지</div>
+        <div class="sc-desc"><code>image_url</code> = <code>scene_NN_img_02.png</code><br><code>delay</code> = N초 대기</div>
+      </div>
+      <div class="scenario-card new-row">
+        <div class="sc-index">index 3 <span style="color:#34d399;font-size:10px;">▲ 변경</span></div>
+        <div class="sc-label">대사</div>
+        <div class="sc-desc"><code>msg</code> = 대사 텍스트<br><code>audio_url</code> = <code>scene_NN_1.wav</code><br>(비어 있으면 자막만 표시)</div>
+      </div>
+    </div>
+
+    <div class="callout tip">
+      <span class="callout-icon">💡</span>
+      <p><strong>delay 계산</strong>: <code>round(scene_NN_0.wav 재생시간 ÷ 2)</code>. 최솟값 1초.</p>
+    </div>
+
+    <h3>허용 감정 코드 (<code>dialogue_emotion</code>)</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>코드</th><th>설명</th></tr>
+        <tr><td><code>기쁨</code></td><td>기쁘고 활기찬 감정</td></tr>
+        <tr><td><code>슬픔</code></td><td>슬프고 감성적인 감정</td></tr>
+        <tr><td><code>무서움</code></td><td>두렵고 긴장된 감정</td></tr>
+      </table>
+    </div>
+
+    <hr>
+
+    <!-- GET /events -->
+    <div id="events" class="section-anchor"></div>
+    <h2><span class="method get">GET</span> /api/runs/{run_id}/events</h2>
+    <p>Server-Sent Events로 작업 진행 상황을 실시간으로 수신합니다.</p>
+
+    <h3>이벤트 종류</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>이벤트명</th><th>설명</th></tr>
+        <tr><td><code>update</code></td><td>상태 변경 또는 미디어 생성 완료</td></tr>
+        <tr><td><code>keepalive</code></td><td>30초마다 전송. data 없음</td></tr>
+      </table>
+    </div>
+
+    <h3>update 이벤트 추가 필드</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>필드</th><th>발생 시점</th><th>설명</th></tr>
+        <tr><td><code>cover_image_url</code></td><td>표지 이미지 완료</td><td>이미지 URL</td></tr>
+        <tr><td><code>cover_audio_url</code></td><td>표지 TTS 완료</td><td>오디오 URL</td></tr>
+        <tr><td><code>scene_no</code></td><td>씬 미디어 이벤트</td><td>씬 번호</td></tr>
+        <tr><td><code>image_url</code></td><td>씬 이미지 완료</td><td>이미지 URL (<code>scene_no</code>와 함께)</td></tr>
+        <tr><td><code>audio_url</code></td><td>씬 내레이션 TTS 완료</td><td><code>scene_NN_0.wav</code> URL (<code>scene_no</code>와 함께)</td></tr>
+        <tr class="new-row"><td><code>dialogue_audio_url</code></td><td>씬 대사 TTS 완료</td><td><code>scene_NN_1.wav</code> URL (<code>scene_no</code>와 함께)</td></tr>
+        <tr><td><code>error</code></td><td><code>status === "FAILED"</code></td><td>에러 메시지</td></tr>
+      </table>
+    </div>
+
+    <h3>이벤트 흐름 예시</h3>
+    <pre><code>event: update
+data: {"run_id":"...","status":"RUNNING","stage":"LLM"}
+
+event: update
+data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL"}
+
+event: update
+data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","cover_audio_url":"/api/runs/.../audio/cover.wav"}
+
+event: update
+data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","scene_no":1,"audio_url":"/api/runs/.../audio/scene_01_0.wav"}
+
+event: update
+data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","scene_no":1,"dialogue_audio_url":"/api/runs/.../audio/scene_01_1.wav"}
+
+event: update
+data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","cover_image_url":"/api/runs/.../images/cover.png"}
+
+event: update
+data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","scene_no":2,"image_url":"/api/runs/.../images/scene_02_img_01.png"}
+
+event: update
+data: {"run_id":"...","status":"DONE","stage":"IMAGE"}
+
+event: keepalive
+data:</code></pre>
+
+    <h3>브라우저 연결 예시</h3>
+    <pre><code>const source = new EventSource("/api/runs/{run_id}/events");
+
+source.addEventListener("update", (e) => {
+  const data = JSON.parse(e.data);
+  if (data.status === "DONE" || data.status === "FAILED") source.close();
+});
+
+source.onerror = () => { /* 재연결 UI 표시 */ };</code></pre>
+
+    <hr>
+
+    <!-- GET /story -->
+    <div id="story" class="section-anchor"></div>
+    <h2><span class="method get">GET</span> /api/runs/{run_id}/story</h2>
+    <p>LLM이 생성한 원본 <code>story.json</code>을 반환합니다.</p>
+
+    <pre><code>{
+  <span class="json-key">"title"</span>: <span class="json-str">"말하는 호랑이와 작은 약속"</span>,
+  <span class="json-key">"cover_prompt"</span>: <span class="json-str">"children's book cover, soft watercolor painting, ..."</span>,
+  <span class="json-key">"scenes"</span>: [
+    {
+      <span class="json-key">"scene_no"</span>: <span class="json-num">1</span>,
+      <span class="json-key">"narration"</span>: <span class="json-str">"서당 앞에 커다란 발자국이..."</span>,
+      <span class="json-key">"dialogue"</span>: <span class="json-str">"누가 남긴 걸까?"</span>,
+      <span class="json-key">"dialogue_emotion"</span>: <span class="json-str">"기쁨"</span>,
+      <span class="json-key">"image_prompts"</span>: [<span class="json-str">"watercolor children's book..."</span>, <span class="json-str">"..."</span>]
+    }
+  ]
+}</code></pre>
+
+    <div class="table-wrap">
+      <table>
+        <tr><th>필드</th><th>타입</th><th>제약</th></tr>
+        <tr><td><code>title</code></td><td>string</td><td>빈 문자열 불가</td></tr>
+        <tr><td><code>cover_prompt</code></td><td>string</td><td>영어. 빈 문자열 불가</td></tr>
+        <tr><td><code>scenes</code></td><td>array</td><td>정확히 4개</td></tr>
+        <tr><td><code>scene_no</code></td><td>number</td><td>1 ~ 4, 순서대로</td></tr>
+        <tr><td><code>narration</code></td><td>string</td><td>한국어. 외국어·한자 자동 제거</td></tr>
+        <tr><td><code>dialogue</code></td><td>string</td><td>한국어. 외국어·한자 자동 제거</td></tr>
+        <tr><td><code>dialogue_emotion</code></td><td>string</td><td><code>기쁨</code> / <code>슬픔</code> / <code>무서움</code></td></tr>
+        <tr><td><code>image_prompts</code></td><td>string[]</td><td>정확히 2개. 영어. 한자 불가</td></tr>
+      </table>
+    </div>
+
+    <hr>
+
+    <!-- GET /images -->
+    <div id="images" class="section-anchor"></div>
+    <h2><span class="method get">GET</span> /api/runs/{run_id}/images/{filename}</h2>
+    <p>생성된 PNG 이미지를 반환합니다.</p>
+    <div class="table-wrap">
+      <table>
+        <tr><th>응답 형식</th><td><code>image/png</code></td></tr>
+        <tr><th>캐시</th><td><code>Cache-Control: no-store</code></td></tr>
+      </table>
+    </div>
+    <h3>파일명 패턴</h3>
+    <pre><code>cover.png
+scene_01_img_01.png  ~  scene_04_img_02.png</code></pre>
+    <div class="table-wrap">
+      <table>
+        <tr><th>처리 위치</th><th>파일명</th></tr>
+        <tr><td>마스터 (RTX 3080 Ti)</td><td>cover.png, scene_01_img_01/02.png, scene_04_img_01/02.png</td></tr>
+        <tr><td>워커 (RTX 5080)</td><td>scene_02_img_01/02.png, scene_03_img_01/02.png</td></tr>
+      </table>
+    </div>
+
+    <hr>
+
+    <!-- GET /audio -->
+    <div id="audio" class="section-anchor"></div>
+    <h2><span class="method get">GET</span> /api/runs/{run_id}/audio/{filename}</h2>
+    <p>생성된 WAV 오디오를 반환합니다.</p>
+    <div class="table-wrap">
+      <table>
+        <tr><th>응답 형식</th><td><code>audio/wav</code></td></tr>
+        <tr><th>포맷</th><td>RIFF PCM, 비압축, 모노</td></tr>
+        <tr><th>캐시</th><td><code>Cache-Control: no-store</code></td></tr>
+      </table>
+    </div>
+    <h3>파일명 패턴</h3>
+    <pre><code>cover.wav               ← 표지 제목 낭독
+scene_01_0.wav          ← 씬 1 내레이션
+scene_01_1.wav          ← 씬 1 대사
+scene_02_0.wav  ~  scene_04_0.wav   (각 씬 내레이션)
+scene_02_1.wav  ~  scene_04_1.wav   (각 씬 대사)</code></pre>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <p>이전 버전과 달리 씬 오디오가 <code>scene_01.wav</code> 형태의 단일 파일이 아닌, 내레이션(<code>_0</code>)과 대사(<code>_1</code>)로 분리됩니다.</p>
+    </div>
+
+    <hr>
+
+    <!-- Client flow -->
+    <div id="flow" class="section-anchor"></div>
+    <h2>클라이언트 구현 흐름</h2>
+
+    <pre><code>1. POST /api/runs                    → run_id 수신
+2. GET  /api/runs/{id}/events        SSE 연결
+   + GET  /api/runs/{id}             1500ms 폴링 병행
+3. scenes.length === 4 감지          → LLM 완료, 씬 카드 4개 렌더링
+4. scene.status === "End" 감지       → 해당 씬 재생 가능
+5. status === "DONE"                 → 전체 완료</code></pre>
+
+    <h3>진행률 계산 (앱 기준)</h3>
+    <div class="table-wrap">
+      <table>
+        <tr><th>분류</th><th>항목</th><th>개수</th></tr>
+        <tr><td>스토리</td><td>story_title 1 + scenes 4</td><td><strong>5</strong></td></tr>
+        <tr><td>이미지</td><td>cover 1 + 씬 이미지 2×4</td><td><strong>9</strong></td></tr>
+        <tr><td>오디오</td><td>cover 1 + 씬 내레이션 4</td><td><strong>5</strong></td></tr>
+        <tr><td><strong>합계</strong></td><td></td><td><strong>19</strong></td></tr>
+      </table>
+    </div>
+    <p>씬 대사 오디오(<code>scene_NN_1.wav</code>) 4개는 진행률 계산에서 제외됩니다.</p>
+
+    <h3>표지 URL 추출</h3>
+    <pre><code>const scenarios   = data.cover?.scenarios || [];
+const coverImage  = (scenarios.find(s => s.index === 0) || {}).image_url || '';
+const coverAudio  = (scenarios.find(s => s.index === 1) || {}).audio_url || '';</code></pre>
+
+    <h3>씬 재생 흐름</h3>
+    <pre><code>async function playScene(scene) {
+  for (const step of scene.scenarios) {
+    if (step.image_url) {
+      showImage(step.image_url);
+      await wait(step.delay * 1000);          // delay초 대기
+    }
+    if (step.audio_url) {
+      showSubtitle(step.msg);
+      await playAudio(step.audio_url);        // 오디오 완료까지 대기
+    }
+    if (!step.image_url && !step.audio_url && step.msg) {
+      showSubtitle(step.msg);                 // index 3: 대사 자막만
+    }
+  }
+}</code></pre>
+
+    <hr>
+
+    <!-- curl -->
+    <div id="curl" class="section-anchor"></div>
+    <h2>curl 예시</h2>
+    <pre><code><span class="json-comment"># 작업 생성</span>
+curl -X POST http://127.0.0.1:8000/api/runs \
+  -H "Content-Type: application/json" \
+  -d '{"era_ko":"조선 시대","place_ko":"한양","characters_ko":"호기심 많은 아이와 말하는 호랑이","topic_ko":"우정"}'
+
+<span class="json-comment"># 상태 조회</span>
+curl http://127.0.0.1:8000/api/runs/20260429_173423_d118aa
+
+<span class="json-comment"># SSE 확인</span>
+curl -N http://127.0.0.1:8000/api/runs/20260429_173423_d118aa/events
+
+<span class="json-comment"># 산출물 다운로드</span>
+curl -o cover.png       http://127.0.0.1:8000/api/runs/20260429_173423_d118aa/images/cover.png
+curl -o cover.wav       http://127.0.0.1:8000/api/runs/20260429_173423_d118aa/audio/cover.wav
+curl -o scene1_narr.wav http://127.0.0.1:8000/api/runs/20260429_173423_d118aa/audio/scene_01_0.wav
+curl -o scene1_dial.wav http://127.0.0.1:8000/api/runs/20260429_173423_d118aa/audio/scene_01_1.wav
+curl -o story.json      http://127.0.0.1:8000/api/runs/20260429_173423_d118aa/story</code></pre>
+
+  </main>
+</div>
+
+<script>
+  /* Active sidebar link on scroll */
+  const sections = document.querySelectorAll('.section-anchor');
+  const links = document.querySelectorAll('.sidebar a');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        links.forEach(a => {
+          a.classList.toggle('active', a.getAttribute('href') === `#${id}`);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
