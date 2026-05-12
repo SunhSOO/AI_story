@@ -61,7 +61,7 @@ async def image_generate(req: ImageRequest):
     return Response(content=img_bytes, media_type="image/png")
 
 
-_TTS_SCENE_TIMEOUT = 180
+_TTS_SCENE_TIMEOUT = 600
 _TTS_BATCH_TIMEOUT_PER_ITEM = 180
 
 
@@ -79,6 +79,10 @@ async def _maybe_unload_tts_after_request(scene_no: int) -> None:
 
 @app.post("/tts/generate")
 async def tts_generate(req: TTSRequest):
+    print(
+        f"[WORKER TTS] /tts/generate received scene={req.scene_no} "
+        f"narration_len={len(req.narration)} dialogue_len={len(req.dialogue)}"
+    )
     loop = asyncio.get_event_loop()
     from app.clients.voxcpm2_client import get_tts_executor, reset_tts_executor
 

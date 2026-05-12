@@ -12,7 +12,8 @@
       "Bash(git add *)",
       "Bash(git restore *)",
       "Bash(dir \"c:\\\\Users\\\\user\\\\Desktop\\\\make_story\\\\voxcpm2TTS\")",
-      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'c:\\\\Users\\\\user\\\\Desktop\\\\make_story\\\\app\\\\jobs\\\\story_job.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")"
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'c:\\\\Users\\\\user\\\\Desktop\\\\make_story\\\\app\\\\jobs\\\\story_job.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'c:\\\\Users\\\\user\\\\Desktop\\\\make_story\\\\app\\\\jobs\\\\story_job.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\(r'c:\\\\Users\\\\user\\\\Desktop\\\\make_story\\\\app\\\\workers\\\\worker_server.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")"
     ]
   }
 }

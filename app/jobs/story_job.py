@@ -154,6 +154,11 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 dialogue: str,
                 output_filename: str,
             ) -> Path | None:
+                t0 = time.time()
+                print(
+                    f"[MASTER TTS] -> {output_filename} (scene={scene_no} "
+                    f"narration_len={len(narration)} dialogue_len={len(dialogue)})"
+                )
                 try:
                     wav_bytes = await worker.generate_tts(
                         scene_no=scene_no,
@@ -163,11 +168,18 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                         dialogue_emotion="",
                     )
                 except Exception as exc:
-                    print(f"[WORKER TTS] {output_filename} failed (non-fatal): {exc!r}")
+                    print(
+                        f"[MASTER TTS] {output_filename} failed after "
+                        f"{time.time() - t0:.1f}s (non-fatal): {exc!r}"
+                    )
                     return None
                 output_path = run_dir / "audio" / output_filename
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 output_path.write_bytes(wav_bytes)
+                print(
+                    f"[MASTER TTS] <- {output_filename} bytes={len(wav_bytes)} "
+                    f"elapsed={time.time() - t0:.1f}s"
+                )
                 return output_path
 
             # ── Cover audio ──
