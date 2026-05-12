@@ -29,7 +29,7 @@ Create one Korean children's story with exactly 4 scenes from the user inputs.
 ### Language Rules
 - title: Korean
 - cover_prompt: English tags for the full story cover
-- narration: Korean story narration, exactly 3 short sentences
+- narration: Korean story narration, exactly 3 short sentences (~했어요, ~했답니다)
 - dialogue: Korean character speech, 1 short sentence, no quotation marks
 - image_prompts: English tag-style prompts, comma-separated
 - dialogue_emotion: one of 기쁨, 슬픔, 무서움
