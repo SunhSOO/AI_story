@@ -6,7 +6,7 @@ import wave
 from pathlib import Path
 
 from app.core.config import settings
-from app.schemas.run_schema import RunStage, RunStateResponse, RunStatus, SceneInfo
+from app.schemas.run_schema import RunStage, RunStateResponse, RunStatus, SceneInfo, ScenarioItem, SceneScenarioInfo
 from app.schemas.story_schema import StorySchema
 
 
@@ -74,10 +74,28 @@ def load_run_response(run_id: str) -> RunStateResponse | None:
         status=RunStatus.DONE if complete else RunStatus.FAILED,
         stage=RunStage.IMAGE if cover_image_url or any(s.image_urls for s in scene_infos) else RunStage.LLM,
         story_title=story_title,
-        cover_image_url=cover_image_url,
-        cover_audio_url=cover_audio_url,
+        cover=_build_cover_scenario(cover_image_url, cover_audio_url, story_title),
         scenes=[s.to_scenario_info() for s in scene_infos],
         error=None if complete else "서버가 재시작되어 파일에서 가능한 결과만 복구했습니다.",
+    )
+
+
+def _build_cover_scenario(cover_image_url: str, cover_audio_url: str, story_title: str) -> SceneScenarioInfo:
+    has_image = bool(cover_image_url)
+    has_audio = bool(cover_audio_url)
+    if has_image and has_audio:
+        status = "End"
+    elif has_image or has_audio:
+        status = "Running"
+    else:
+        status = "Pending"
+    return SceneScenarioInfo(
+        scene_no=0,
+        status=status,
+        scenarios=[
+            ScenarioItem(index=0, image_url=cover_image_url, delay=0),
+            ScenarioItem(index=1, msg=story_title, audio_url=cover_audio_url, delay=0),
+        ],
     )
 
 

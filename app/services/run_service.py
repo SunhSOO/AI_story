@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from app.schemas.run_schema import CreateRunRequest, RunStage, RunStateResponse, RunStatus, SceneInfo
+from app.schemas.run_schema import CreateRunRequest, RunStage, RunStateResponse, RunStatus, SceneInfo, ScenarioItem, SceneScenarioInfo
 from app.services import storage_service
 
 
@@ -21,14 +21,31 @@ class RunState:
         self.error: Optional[str] = None
         self.created_at = datetime.now()
 
+    def _build_cover(self) -> SceneScenarioInfo:
+        has_image = bool(self.cover_image_url)
+        has_audio = bool(self.cover_audio_url)
+        if has_image and has_audio:
+            status = "End"
+        elif has_image or has_audio:
+            status = "Running"
+        else:
+            status = "Pending"
+        return SceneScenarioInfo(
+            scene_no=0,
+            status=status,
+            scenarios=[
+                ScenarioItem(index=0, image_url=self.cover_image_url, delay=0),
+                ScenarioItem(index=1, msg=self.story_title, audio_url=self.cover_audio_url, delay=0),
+            ],
+        )
+
     def to_response(self) -> RunStateResponse:
         return RunStateResponse(
             run_id=self.run_id,
             status=self.status,
             stage=self.stage,
             story_title=self.story_title,
-            cover_image_url=self.cover_image_url,
-            cover_audio_url=self.cover_audio_url,
+            cover=self._build_cover(),
             scenes=[s.to_scenario_info() for s in self.scenes],
             error=self.error,
         )

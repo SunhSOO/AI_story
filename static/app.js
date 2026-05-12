@@ -233,12 +233,15 @@ function subtitleFor(data, counts) {
 
 function getCounts(data) {
   const scenes = data.scenes || [];
-  // story_title 1개 + scenes 배열 길이 (LLM 완료 후 한번에 4개)
+  const coverScenarios = data.cover?.scenarios || [];
+  const coverImageUrl = (coverScenarios.find((s) => s.index === 0) || {}).image_url || '';
+  const coverAudioUrl = (coverScenarios.find((s) => s.index === 1) || {}).audio_url || '';
+
   const story = (data.story_title ? 1 : 0) + scenes.length;
-  const image = (data.cover_image_url ? 1 : 0) + scenes.reduce((sum, scene) => {
+  const image = (coverImageUrl ? 1 : 0) + scenes.reduce((sum, scene) => {
     return sum + getSceneSlots(scene).filter(Boolean).length;
   }, 0);
-  const audio = (data.cover_audio_url ? 1 : 0) + scenes.filter((scene) => {
+  const audio = (coverAudioUrl ? 1 : 0) + scenes.filter((scene) => {
     const scenarios = scene?.scenarios || [];
     return Boolean((scenarios.find((s) => s.index === 1) || {}).audio_url);
   }).length;
@@ -265,14 +268,17 @@ function setStepState(step, done, active) {
 }
 
 function renderCover(data) {
-  const heading = document.getElementById('cover-heading');
+  const scenarios = data.cover?.scenarios || [];
+  const imageUrl = (scenarios.find((s) => s.index === 0) || {}).image_url || '';
+  const audioUrl = (scenarios.find((s) => s.index === 1) || {}).audio_url || '';
+
+  document.getElementById('cover-heading').textContent = imageUrl ? '표지 준비 완료' : '표지 생성 중';
   const title = document.getElementById('cover-title');
-  heading.textContent = data.cover_image_url ? '표지 준비 완료' : '표지 생성 중';
   title.textContent = data.story_title || '이야기 제목 대기';
   title.classList.toggle('placeholder-line', !data.story_title);
 
-  updateImageSlot('cover-image-slot', 'cover-image', data.cover_image_url, '표지 이미지 대기');
-  updateAudio('cover-audio-shell', 'cover-audio', 'cover-audio-status', data.cover_audio_url);
+  updateImageSlot('cover-image-slot', 'cover-image', imageUrl, '표지 이미지 대기');
+  updateAudio('cover-audio-shell', 'cover-audio', 'cover-audio-status', audioUrl);
 }
 
 function renderScenes(scenes) {

@@ -90,7 +90,6 @@ class RunStateResponse(BaseModel):
     status: RunStatus
     stage: RunStage
     story_title: str = ""
-    cover_image_url: str = ""
-    cover_audio_url: str = ""
+    cover: Optional[SceneScenarioInfo] = None
     scenes: list[SceneScenarioInfo] = Field(default_factory=list)
     error: Optional[str] = None
