@@ -84,14 +84,15 @@ class WorkerClient:
     async def generate_tts_batch(
         self,
         items: list[dict],
-    ) -> dict[int, bytes]:
-        """배치 TTS 요청: 여러 scene의 TTS를 1회 요청으로 생성하고 자동 VRAM 해제.
+    ) -> dict[str, bytes]:
+        """배치 TTS 요청: narration/dialogue 분할 생성.
 
         Args:
             items: list of {"scene_no", "narration", "dialogue", "narration_emotion", "dialogue_emotion"}
 
         Returns:
-            {scene_no: wav_bytes} dict
+            {"scene_no_0": narration_wav_bytes, "scene_no_1": dialogue_wav_bytes, ...}
+            키 형식: "{scene_no}_0" = narration, "{scene_no}_1" = dialogue
         """
         total_timeout = aiohttp.ClientTimeout(
             total=_TTS_BATCH_TIMEOUT_PER_ITEM * len(items) + 120,  # +120s for unload
@@ -110,12 +111,12 @@ class WorkerClient:
                             f"Worker TTS batch HTTP {resp.status}: {body[:500]}"
                         )
                     data = await resp.json()
-                    # base64 디코딩
-                    result: dict[int, bytes] = {}
-                    for scene_no_str, b64_wav in data.items():
-                        result[int(scene_no_str)] = base64.b64decode(b64_wav)
+                    # base64 디코딩 — 키: "scene_no_0", "scene_no_1"
+                    result: dict[str, bytes] = {}
+                    for key, b64_wav in data.items():
+                        result[key] = base64.b64decode(b64_wav)
                     print(
-                        f"[MASTER TTS BATCH] response scenes={list(result.keys())} "
+                        f"[MASTER TTS BATCH] response keys={list(result.keys())} "
                         f"total_bytes={sum(len(v) for v in result.values())}"
                     )
                     return result

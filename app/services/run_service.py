@@ -85,6 +85,12 @@ class RunState:
                 s.image_delay = image_delay
                 return
 
+    def set_scene_dialogue_audio(self, scene_no: int, filename: str) -> None:
+        for s in self.scenes:
+            if s.scene_no == scene_no:
+                s.dialogue_audio_url = f"/api/runs/{self.run_id}/audio/{filename}"
+                return
+
 
 class RunRegistry:
     def __init__(self) -> None:

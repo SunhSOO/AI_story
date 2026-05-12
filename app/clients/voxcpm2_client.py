@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.exceptions import TTSError
 
 _WHITESPACE_RE = re.compile(r"\s+")
-_BRACKETED_TTS_NOTE_RE = re.compile(r"[\(\[\{<（［｛【「『][^)\]\}>）］｝】」』]*[\)\]\}>）］｝】」』]")
+_BRACKETED_TTS_NOTE_RE = re.compile(r"[\(\[\{<（［｛【「『][^)\]}\>）］｝】」』]*[\)\]\}>）］｝】」』]")
 _ALLOWED_TTS_PUNCTUATION = {"?"}
 _PEAK_CEILING = 0.95
 _TARGET_RMS = 10 ** (-20 / 20)
@@ -116,7 +116,6 @@ def _cleanup_after_tts(label: str) -> None:
         if torch.cuda.is_available():
             torch.cuda.synchronize()
             torch.cuda.empty_cache()
-            torch.cuda.ipc_collect()
             torch.cuda.reset_peak_memory_stats()
     except Exception as e:
         print(f"[TTS] post-scene cleanup failed: {e}")
@@ -150,7 +149,13 @@ def reset_tts_executor() -> None:
 
 
 def unload_model() -> None:
-    """TTS 스레드 안에서 모델·CUDA를 정리한 뒤 executor를 종료."""
+    """TTS 스레드 안에서 모델·CUDA를 정리한 뒤 executor를 종료.
+
+    CUDA 에러 방지를 위해:
+    - delattr로 서브모듈을 개별 삭제하지 않음 (CUDA 텐서 참조 꼬임 방지)
+    - ipc_collect() 호출하지 않음 (IPC 미사용 환경에서 CUDA 상태 손상 방지)
+    - model.to('cpu') → del → gc → empty_cache 순서로만 안전하게 정리
+    """
     import gc
     global _tts_executor, _tts_warmed_up
 
@@ -170,36 +175,26 @@ def unload_model() -> None:
                 except Exception as e:
                     print(f"[TTS] model.to('cpu') skipped: {e}")
 
-                # 2) 모델 내부 서브모듈/텐서 명시적 삭제
-                try:
-                    for attr_name in list(vars(model).keys()):
-                        try:
-                            delattr(model, attr_name)
-                        except Exception:
-                            pass
-                except Exception as e:
-                    print(f"[TTS] submodule cleanup: {e}")
-
+                # 2) 참조만 제거 (delattr로 개별 삭제하면 CUDA 텐서 참조 꼬임)
                 ml._model = None
                 del model
                 print("[TTS] voxcpm2 model unloaded from VRAM")
         except Exception as e:
             print(f"[TTS] model unload: {e}")
 
-        # 3) 철저한 CUDA 메모리 해제
+        # 3) gc → CUDA 캐시 정리 (ipc_collect는 사용하지 않음)
         gc.collect()
         try:
             import torch
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
                 torch.cuda.empty_cache()
-                torch.cuda.ipc_collect()
                 torch.cuda.reset_peak_memory_stats()
                 print("[TTS] CUDA cache cleared")
         except Exception as e:
             print(f"[TTS] CUDA cleanup: {e}")
 
-        # 4) 2차 gc (순환 참조 잔여분 정리)
+        # 4) 2차 gc (순환 참조 잔여분)
         gc.collect()
 
         _log_cuda_memory("unload-after")
@@ -338,3 +333,53 @@ def synthesize_narration_dialogue(
     finally:
         del wav
         _cleanup_after_tts(f"scene {output_path.name}")
+
+
+def synthesize_split(
+    narration: str,
+    dialogue: str,
+    narration_emotion: str | None,
+    dialogue_emotion: str | None,
+    narration_output_path: Path,
+    dialogue_output_path: Path,
+    reference_wav: Path | None = None,
+) -> tuple[bool, bool]:
+    """narration과 dialogue를 각각 별도 WAV 파일로 생성.
+
+    Returns:
+        (narration_generated, dialogue_generated) — 각각 생성 여부.
+    """
+    ref_wav = reference_wav or settings.tts_reference_wav
+    if not ref_wav.exists():
+        raise TTSError(f"TTS reference WAV not found: {ref_wav}")
+
+    narration_ok = False
+    dialogue_ok = False
+
+    # narration 생성
+    narr_text = _clean_tts_text(narration) if narration else ""
+    if narr_text:
+        print(f"[TTS] narration chars={len(narr_text)} preview={narr_text[:80]}")
+        wav = None
+        try:
+            wav, sr = _generate_wav(narration, narration_emotion, ref_wav)
+            _write_wav(narration_output_path, wav, sr)
+            narration_ok = True
+        finally:
+            del wav
+            _cleanup_after_tts(f"narration {narration_output_path.name}")
+
+    # dialogue 생성
+    dial_text = _clean_tts_text(dialogue) if dialogue else ""
+    if dial_text:
+        print(f"[TTS] dialogue chars={len(dial_text)} preview={dial_text[:80]}")
+        wav = None
+        try:
+            wav, sr = _generate_wav(dialogue, dialogue_emotion, ref_wav)
+            _write_wav(dialogue_output_path, wav, sr)
+            dialogue_ok = True
+        finally:
+            del wav
+            _cleanup_after_tts(f"dialogue {dialogue_output_path.name}")
+
+    return narration_ok, dialogue_ok

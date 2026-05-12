@@ -52,11 +52,12 @@ class SceneInfo(BaseModel):
     dialogue: str = ""
     dialogue_emotion: str = ""
     image_urls: list[str] = Field(default_factory=list)
-    audio_url: str = ""
+    audio_url: str = ""           # narration audio (_0)
+    dialogue_audio_url: str = ""   # dialogue audio (_1)
     image_delay: int = 1
 
     def to_scenario_info(self) -> SceneScenarioInfo:
-        has_audio = bool(self.audio_url)
+        has_audio = bool(self.audio_url) or bool(self.dialogue_audio_url)
         has_all_images = len(self.image_urls) >= IMAGES_PER_SCENE
 
         if has_audio and has_all_images:
@@ -75,7 +76,7 @@ class SceneInfo(BaseModel):
             ScenarioItem(index=0, msg="", audio_url="", image_url=img_urls[0], delay=d),
             ScenarioItem(index=1, msg=self.narration, audio_url=self.audio_url, image_url="", delay=0),
             ScenarioItem(index=2, msg="", audio_url="", image_url=img_urls[1], delay=d),
-            ScenarioItem(index=3, msg=self.dialogue, audio_url="", image_url="", delay=0),
+            ScenarioItem(index=3, msg=self.dialogue, audio_url=self.dialogue_audio_url, image_url="", delay=0),
         ]
 
         return SceneScenarioInfo(

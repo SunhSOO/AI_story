@@ -26,14 +26,21 @@ _LOCAL_IMAGES: dict[int, list[int]] = {
 _MAX_SEED = 2_147_483_647
 
 
-def _wav_image_delay(path: Path) -> int:
-    """WAV duration divided by the scene image count. Returns 1 on read failure."""
+def _wav_duration(path: Path) -> float:
+    """WAV 파일 재생 시간(초). 읽기 실패 시 0 반환."""
     try:
         with wave.open(str(path), "rb") as f:
-            duration = f.getnframes() / f.getframerate()
-        return max(1, round(duration / settings.images_per_scene))
+            return f.getnframes() / f.getframerate()
     except Exception:
+        return 0.0
+
+
+def _wav_image_delay(path: Path) -> int:
+    """WAV duration divided by the scene image count. Returns 1 on read failure."""
+    duration = _wav_duration(path)
+    if duration <= 0:
         return 1
+    return max(1, round(duration / settings.images_per_scene))
 
 
 async def _emit(run_state: RunState, extra: dict | None = None) -> None:
@@ -85,7 +92,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
     """Dual-machine pipeline:
       Stage 1: LLM on 5080 worker
       Stage 2 (parallel):
-        Branch A (worker): batch TTS (cover + scenes) with auto VRAM release, then assigned scene images
+        Branch A (worker): batch TTS (narration/dialogue split) with auto VRAM release, then assigned scene images
         Branch B (local): cover image, assigned scene images
     """
     from app.clients.worker_client import WorkerClient
@@ -134,11 +141,11 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
         base_seed = story_seed
 
-        # Branch A (5080 Worker): batch TTS + assigned images
+        # Branch A (5080 Worker): batch TTS (split) + assigned images
         async def _worker_branch():
-            # ── TTS: 배치 요청으로 cover + 모든 scene 한번에 생성 ──
+            # ── TTS: 배치 요청으로 cover + 모든 scene 한번에 생성 (narration/dialogue 분할) ──
             tts_started_at = time.time()
-            print("[WORKER] TTS batch on 5080 (cover + scenes)...")
+            print("[WORKER] TTS batch on 5080 (cover + scenes, narration/dialogue split)...")
 
             # 배치 아이템 구성
             tts_items = [
@@ -160,16 +167,17 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 })
 
             # 배치 TTS 실행 (완료 후 서버측에서 자동으로 TTS 모델 언로드 + VRAM 해제)
+            # 결과 키 형식: "scene_no_0" (narration), "scene_no_1" (dialogue)
             tts_results = await worker.generate_tts_batch(tts_items)
             print(f"[WORKER] TTS batch done in {time.time() - tts_started_at:.1f}s")
 
-            # ── 결과를 run_state에 반영 ──
-            # Cover audio
-            if 0 in tts_results:
+            # ── Cover audio (0_0) ──
+            cover_key = "0_0"
+            if cover_key in tts_results:
                 cover_audio = "cover.wav"
                 cover_audio_path = run_dir / "audio" / cover_audio
                 cover_audio_path.parent.mkdir(parents=True, exist_ok=True)
-                cover_audio_path.write_bytes(tts_results[0])
+                cover_audio_path.write_bytes(tts_results[cover_key])
                 run_state.set_cover_audio(cover_audio)
                 await _emit(
                     run_state,
@@ -180,25 +188,46 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 )
                 print("[WORKER] TTS cover applied")
 
-            # Scene audio
+            # ── Scene audio (_0=narration, _1=dialogue) ──
             for scene in story.scenes:
                 scene_no = scene.scene_no
-                if scene_no in tts_results:
-                    filename = f"scene_{scene_no:02d}.wav"
-                    audio_path = run_dir / "audio" / filename
-                    audio_path.parent.mkdir(parents=True, exist_ok=True)
-                    audio_path.write_bytes(tts_results[scene_no])
-                    image_delay = _wav_image_delay(audio_path)
-                    run_state.set_scene_audio(scene_no, filename, image_delay)
+                narr_key = f"{scene_no}_0"
+                dial_key = f"{scene_no}_1"
+
+                # narration audio (_0)
+                if narr_key in tts_results:
+                    narr_filename = f"scene_{scene_no:02d}_0.wav"
+                    narr_path = run_dir / "audio" / narr_filename
+                    narr_path.parent.mkdir(parents=True, exist_ok=True)
+                    narr_path.write_bytes(tts_results[narr_key])
+                    image_delay = _wav_image_delay(narr_path)
+                    run_state.set_scene_audio(scene_no, narr_filename, image_delay)
                     await _emit(
                         run_state,
                         {
                             "scene_no": scene_no,
-                            "audio": filename,
-                            "audio_url": f"/api/runs/{run_state.run_id}/audio/{filename}",
+                            "audio": narr_filename,
+                            "audio_url": f"/api/runs/{run_state.run_id}/audio/{narr_filename}",
                         },
                     )
-                    print(f"[WORKER] TTS scene {scene_no} applied")
+                    print(f"[WORKER] TTS scene {scene_no} narration applied → {narr_filename}")
+
+                # dialogue audio (_1)
+                if dial_key in tts_results:
+                    dial_filename = f"scene_{scene_no:02d}_1.wav"
+                    dial_path = run_dir / "audio" / dial_filename
+                    dial_path.parent.mkdir(parents=True, exist_ok=True)
+                    dial_path.write_bytes(tts_results[dial_key])
+                    run_state.set_scene_dialogue_audio(scene_no, dial_filename)
+                    await _emit(
+                        run_state,
+                        {
+                            "scene_no": scene_no,
+                            "dialogue_audio": dial_filename,
+                            "dialogue_audio_url": f"/api/runs/{run_state.run_id}/audio/{dial_filename}",
+                        },
+                    )
+                    print(f"[WORKER] TTS scene {scene_no} dialogue applied → {dial_filename}")
 
             # ── 이미지 생성 (TTS VRAM은 이미 해제된 상태) ──
             for scene_no, img_idxs in _WORKER_IMAGES.items():
