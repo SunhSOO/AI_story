@@ -15,23 +15,23 @@ from app.services.run_service import RunRegistry, RunState
 # ── 이미지 분배 정의 ──────────────────────────────────────────────────────────
 # {scene_no: [img_idx, ...]}  img_idx는 1-based
 _WORKER_IMAGES: dict[int, list[int]] = {
-    2: [1, 2, 3],
-    3: [1, 2, 3],
+    2: [1, 2],
+    3: [1, 2],
 }
 _LOCAL_IMAGES: dict[int, list[int]] = {
-    1: [1, 2, 3],
-    4: [1, 2, 3],
+    1: [1, 2],
+    4: [1, 2],
 }
 
 _MAX_SEED = 2_147_483_647
 
 
 def _wav_image_delay(path: Path) -> int:
-    """WAV 재생시간을 3으로 나눠 반올림한 이미지 딜레이(초) 반환. 읽기 실패 시 1."""
+    """WAV duration divided by the scene image count. Returns 1 on read failure."""
     try:
         with wave.open(str(path), "rb") as f:
             duration = f.getnframes() / f.getframerate()
-        return max(1, round(duration / 3))
+        return max(1, round(duration / settings.images_per_scene))
     except Exception:
         return 1
 

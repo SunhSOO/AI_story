@@ -42,10 +42,9 @@ User inputs:
 - 반드시 영어로 작성
 - 쉼표로 구분된 태그 형식 (예: "1girl, forest, running, sunlight")
 - scene 1에서 주인공 외형을 정의하고, scene 2~4에서 동일한 특징을 유지해야 함
-- 각 장면마다 반드시 서로 다른 3개의 프롬프트를 생성해야 함
+- 각 장면마다 반드시 서로 다른 2개의 프롬프트를 생성해야 함
   - 첫 번째: 장면의 핵심 순간 (클로즈업 또는 강조 구도)
   - 두 번째: 장면 전체 배경과 캐릭터 (와이드 샷)
-  - 세 번째: 감정이나 분위기에 초점을 맞춘 구도 (다른 앵글이나 조명)
 - 숫자를 포함하지 말 것
 
 OUTPUT MUST MATCH THIS EXACT SHAPE:
@@ -59,8 +58,7 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
       "dialogue": "안녕! 나는 새로운 친구를 만나고 싶어.",
       "image_prompts": [
         "close-up of main {characters}, key moment, English tags",
-        "wide shot, full scene with background, English tags",
-        "emotional atmosphere, different angle, English tags"
+        "wide shot, full scene with background, English tags"
       ],
       "dialogue_emotion": "기쁨"
     },
@@ -70,8 +68,7 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
       "dialogue": "어쩌지... 길을 잃은 것 같아.",
       "image_prompts": [
         "close-up of main {characters}, key moment, English tags",
-        "wide shot, full scene with background, {characters},English tags",
-        "emotional atmosphere, different angle, {characters},English tags"
+        "wide shot, full scene with background, {characters},English tags"
       ],
       "dialogue_emotion": "슬픔"
     },
@@ -81,8 +78,7 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
       "dialogue": "포기하지 말자! 한 번만 더 해볼게.",
       "image_prompts": [
         "close-up of main {characters}, key moment, English tags",
-        "wide shot, full scene with background and {characters}, English tags",
-        "emotional atmosphere, different angle,{characters}, English tags"
+        "wide shot, full scene with background and {characters}, English tags"
       ],
       "dialogue_emotion": "무서움"
     },
@@ -92,8 +88,7 @@ OUTPUT MUST MATCH THIS EXACT SHAPE:
       "dialogue": "우리 함께라면 무엇이든 할 수 있어!",
       "image_prompts": [
         "close-up of main {characters}, key moment, English tags",
-        "wide shot, full scene with background,{characters}, English tags",
-        "emotional atmosphere, different angle, {characters},English tags"
+        "wide shot, full scene with background,{characters}, English tags"
       ],
       "dialogue_emotion": "기쁨"
     }
@@ -105,6 +100,6 @@ REMINDER:
 - cover_prompt must be English only (book cover image for the whole story).
 - scenes array must have exactly 4 elements.
 - each scene must have narration AND dialogue (both Korean).
-- each scene's image_prompts must be an array of exactly 3 different English strings.
+- each scene's image_prompts must be an array of exactly 2 different English strings.
 - dialogue_emotion must be one of: 기쁨, 슬픔, 무서움.
 - cover_prompt and image_prompts must be English only. No Chinese characters anywhere.

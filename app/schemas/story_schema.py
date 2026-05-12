@@ -3,7 +3,7 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.core.constants import ALLOWED_EMOTIONS, SCENE_COUNT
+from app.core.constants import ALLOWED_EMOTIONS, IMAGES_PER_SCENE, SCENE_COUNT
 
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -56,7 +56,7 @@ class SceneSchema(BaseModel):
     scene_no: int = Field(..., ge=1, le=4)
     narration: str = Field(...)
     dialogue: str = Field(..., description="장면 내 캐릭터 발화 (한국어)")
-    image_prompts: list[str] = Field(..., min_length=3, max_length=3)
+    image_prompts: list[str] = Field(..., min_length=IMAGES_PER_SCENE, max_length=IMAGES_PER_SCENE)
     dialogue_emotion: str = Field(...)
 
     @field_validator("narration", "dialogue", mode="before")

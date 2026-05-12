@@ -2,12 +2,12 @@ root ::= obj
 
 obj ::= "{" ws "\"title\"" ws ":" ws string ws "," ws "\"cover_prompt\"" ws ":" ws string ws "," ws "\"scenes\"" ws ":" ws "[" ws scene1 ws "," ws scene2 ws "," ws scene3 ws "," ws scene4 ws "]" ws "}"
 
-scene1 ::= "{" ws "\"scene_no\"" ws ":" ws "1" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"dialogue_emotion\"" ws ":" ws string ws "}"
-scene2 ::= "{" ws "\"scene_no\"" ws ":" ws "2" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"dialogue_emotion\"" ws ":" ws string ws "}"
-scene3 ::= "{" ws "\"scene_no\"" ws ":" ws "3" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"dialogue_emotion\"" ws ":" ws string ws "}"
-scene4 ::= "{" ws "\"scene_no\"" ws ":" ws "4" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts3 ws "," ws "\"dialogue_emotion\"" ws ":" ws string ws "}"
+scene1 ::= "{" ws "\"scene_no\"" ws ":" ws "1" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts2 ws "," ws "\"dialogue_emotion\"" ws ":" ws string ws "}"
+scene2 ::= "{" ws "\"scene_no\"" ws ":" ws "2" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts2 ws "," ws "\"dialogue_emotion\"" ws ":" ws string ws "}"
+scene3 ::= "{" ws "\"scene_no\"" ws ":" ws "3" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts2 ws "," ws "\"dialogue_emotion\"" ws ":" ws string ws "}"
+scene4 ::= "{" ws "\"scene_no\"" ws ":" ws "4" ws "," ws "\"narration\"" ws ":" ws string ws "," ws "\"dialogue\"" ws ":" ws string ws "," ws "\"image_prompts\"" ws ":" ws prompts2 ws "," ws "\"dialogue_emotion\"" ws ":" ws string ws "}"
 
-prompts3 ::= "[" ws string ws "," ws string ws "," ws string ws "]"
+prompts2 ::= "[" ws string ws "," ws string ws "]"
 
 string ::= "\"" schars "\""
 schars ::= "" | schar schars

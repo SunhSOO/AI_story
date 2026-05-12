@@ -207,8 +207,8 @@ curl -X POST http://127.0.0.1:8000/api/stt/field \
 
 | 처리 위치 | 생성 이미지 |
 | --- | --- |
-| 워커 (RTX 5080) | `scene_02_img_01.png`, `scene_02_img_03.png`, `scene_03_img_02.png`, `scene_04_img_01.png`, `scene_04_img_03.png` |
-| 마스터 (RTX 3080 Ti) | `cover.png`, `scene_01_img_01.png`, `scene_01_img_02.png`, `scene_01_img_03.png`, `scene_02_img_02.png`, `scene_03_img_01.png`, `scene_03_img_03.png`, `scene_04_img_02.png` |
+| 워커 (RTX 5080) | `scene_02_img_01.png`, `scene_02_img_02.png`, `scene_03_img_01.png`, `scene_03_img_02.png` |
+| 마스터 (RTX 3080 Ti) | `cover.png`, `scene_01_img_01.png`, `scene_01_img_02.png`, `scene_04_img_01.png`, `scene_04_img_02.png` |
 
 > 음성 생성은 현재 워커에서만 수행합니다. 마스터는 TTS 모델을 로드하거나 음성을 생성하지 않습니다.
 
@@ -252,7 +252,7 @@ outputs/runs/{run_id}/
   events.jsonl
   images/
     cover.png
-    scene_01_img_01.png ~ scene_04_img_03.png
+    scene_01_img_01.png ~ scene_04_img_02.png
   audio/
     cover.wav
     scene_01.wav ~ scene_04.wav
@@ -310,13 +310,6 @@ Status: `200 OK`
         },
         {
           "index": 3,
-          "msg": "",
-          "audio_url": "",
-          "image_url": "/api/runs/20260429_173423_d118aa/images/scene_01_img_03.png",
-          "delay": 4
-        },
-        {
-          "index": 4,
           "msg": "누가 이렇게 큰 발자국을 남긴 걸까?",
           "audio_url": "",
           "image_url": "",
@@ -350,7 +343,7 @@ Status: `200 OK`
 | --- | --- | --- |
 | `scene_no` | number | 장면 번호. `1`~`4` |
 | `status` | string | `Pending`, `Running`, `End` 중 하나 |
-| `scenarios` | array | 재생 시퀀스 목록. 항상 5개 (index 0~4) |
+| `scenarios` | array | 재생 시퀀스 목록. 항상 4개 (index 0~3) |
 
 ### `scenes[].status` 값
 
@@ -358,26 +351,26 @@ Status: `200 OK`
 | --- | --- |
 | `Pending` | 오디오·이미지 모두 미생성 |
 | `Running` | 일부 리소스 생성 완료 |
-| `End` | 오디오 + 이미지 3개 모두 완료 |
+| `End` | 오디오 + 이미지 2개 모두 완료 |
 
 ### `scenarios[]` 필드
 
 | 필드 | 타입 | 설명 |
 | --- | --- | --- |
-| `index` | number | 재생 순서. `0`~`4` |
-| `msg` | string | 자막 텍스트. index 1 = 내레이션, index 4 = 대사. 나머지는 빈 문자열 |
+| `index` | number | 재생 순서. `0`~`3` |
+| `msg` | string | 자막 텍스트. index 1 = 내레이션, index 3 = 대사. 나머지는 빈 문자열 |
 | `audio_url` | string | 오디오 URL. index 1에만 존재. 나머지는 빈 문자열 |
-| `image_url` | string | 이미지 URL. index 0·2·3에만 존재. 나머지는 빈 문자열 |
+| `image_url` | string | 이미지 URL. index 0·2에만 존재. 나머지는 빈 문자열 |
 | `delay` | number | 다음 index로 넘어가기 전 대기 시간(초). 아래 설명 참고 |
 
 ### `delay` 동작 규칙
 
 | `delay` 값 | 동작 |
 | --- | --- |
-| `0` | 오디오 재생 완료까지 대기 (index 1) 또는 자막만 표시 (index 4) |
-| `N` (양수) | 이미지 표시 후 N초 대기. **WAV 재생시간 ÷ 3 반올림** 값으로 자동 계산됨 |
+| `0` | 오디오 재생 완료까지 대기 (index 1) 또는 자막만 표시 (index 3) |
+| `N` (양수) | 이미지 표시 후 N초 대기. **WAV 재생시간 ÷ 2 반올림** 값으로 자동 계산됨 |
 
-> **delay 계산 예시**: WAV 재생시간이 12초이면 `delay = round(12 / 3) = 4`. 최솟값은 1초.
+> **delay 계산 예시**: WAV 재생시간이 12초이면 `delay = round(12 / 2) = 6`. 최솟값은 1초.
 
 ### 씬 재생 흐름
 
@@ -386,11 +379,10 @@ index 0 → img_01 표시, delay초 대기
 index 1 → 오디오 재생 시작 (내레이션 → 0.5초 무음 → 대사 순서로 합성됨)
            내레이션 자막 표시, 오디오 완료까지 대기
 index 2 → img_02로 전환, delay초 대기
-index 3 → img_03으로 전환, delay초 대기
-index 4 → 대사 자막 표시 (별도 오디오 없음)
+index 3 → 대사 자막 표시 (별도 오디오 없음)
 ```
 
-> **오디오 구조**: 씬당 WAV 1개에 내레이션과 대사가 순서대로 합성됩니다 (내레이션 → 0.5초 무음 → 대사). index 4의 대사 자막은 오디오가 이미 재생 완료된 후 표시됩니다.
+> **오디오 구조**: 씬당 WAV 1개에 내레이션과 대사가 순서대로 합성됩니다 (내레이션 → 0.5초 무음 → 대사). index 3의 대사 자막은 오디오가 이미 재생 완료된 후 표시됩니다.
 
 ### 상태 값
 
@@ -531,7 +523,6 @@ Content-Type: `application/json`
       "dialogue_emotion": "긴장",
       "image_prompts": [
         "watercolor children's book illustration, ...",
-        "watercolor children's book illustration, ...",
         "watercolor children's book illustration, ..."
       ]
     }
@@ -556,7 +547,7 @@ Content-Type: `application/json`
 | `dialogue` | string | 빈 문자열 불가 |
 | `narration_emotion` | string | 허용 감정 코드 중 하나 |
 | `dialogue_emotion` | string | 허용 감정 코드 중 하나 |
-| `image_prompts` | string[] | 정확히 3개, 빈 문자열·한자 불가 |
+| `image_prompts` | string[] | 정확히 2개, 빈 문자열·한자 불가 |
 
 ### 에러
 
@@ -579,7 +570,7 @@ Content-Type: `application/json`
 
 ```text
 cover.png
-scene_01_img_01.png ~ scene_04_img_03.png
+scene_01_img_01.png ~ scene_04_img_02.png
 ```
 
 ### 성공 응답
@@ -661,7 +652,7 @@ async function playScene(scene) {
       await playAudio(step.audio_url);   // 재생 완료까지 대기
     }
     if (!step.image_url && !step.audio_url && step.msg) {
-      showSubtitle(step.msg);            // index 4: 대사 자막만 표시
+      showSubtitle(step.msg);            // index 3: 대사 자막만 표시
     }
   }
 }

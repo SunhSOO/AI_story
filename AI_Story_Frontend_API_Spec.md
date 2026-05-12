@@ -172,13 +172,6 @@
         },
         {
           "index": 3,
-          "msg": "",
-          "audio_url": "",
-          "image_url": "/api/runs/20260429_173423_d118aa/images/scene_01_img_03.png",
-          "delay": 4
-        },
-        {
-          "index": 4,
           "msg": "누가 이렇게 큰 발자국을 남긴 걸까?",
           "audio_url": "",
           "image_url": "",
@@ -227,13 +220,13 @@
 |---|---|---|
 | `scene_no` | number | 씬 번호. `1` ~ `4` |
 | `status` | string | `Pending` / `Running` / `End` |
-| `scenarios` | array | 재생 시퀀스. **항상 5개** (index 0~4) |
+| `scenarios` | array | 재생 시퀀스. **항상 4개** (index 0~3) |
 
 #### `scenarios[]` 필드
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `index` | number | 재생 순서. `0` ~ `4` |
+| `index` | number | 재생 순서. `0` ~ `3` |
 | `msg` | string | 자막 텍스트 |
 | `audio_url` | string | 오디오 URL |
 | `image_url` | string | 이미지 URL |
@@ -246,10 +239,9 @@
 | `0` | `image_url`, `delay` | 첫 번째 이미지 표시 후 delay초 대기 |
 | `1` | `msg`, `audio_url` | 내레이션 자막 + 오디오 재생 (`delay: 0` = 오디오 완료까지 대기) |
 | `2` | `image_url`, `delay` | 두 번째 이미지로 전환 후 delay초 대기 |
-| `3` | `image_url`, `delay` | 세 번째 이미지로 전환 후 delay초 대기 |
-| `4` | `msg` | 대사 자막 표시 (오디오 없음) |
+| `3` | `msg` | 대사 자막 표시 (오디오 없음) |
 
-> **delay 계산 방식**: 각 이미지의 delay 값은 `round(WAV 재생시간 ÷ 3)` 으로 자동 계산됩니다. 최솟값 1초.  
+> **delay 계산 방식**: 각 이미지의 delay 값은 `round(WAV 재생시간 ÷ 2)` 으로 자동 계산됩니다. 최솟값 1초.  
 > **오디오 구조**: 씬당 WAV 1개에 내레이션 → 0.5초 무음 → 대사 순서로 합성됩니다.
 
 **에러**
@@ -350,7 +342,7 @@ source.addEventListener("update", (e) => {
 
 ```
 cover.png
-scene_01_img_01.png  ~  scene_04_img_03.png
+scene_01_img_01.png  ~  scene_04_img_02.png
 ```
 
 **에러**
@@ -436,9 +428,9 @@ scene_01.wav ~ scene_04.wav  ← 씬 TTS (내레이션 + 0.5초 무음 + 대사 
 | 분류 | 항목 | 개수 |
 |---|---|---|
 | 스토리 | story_title 1개 + scenes 4개 | 5 |
-| 이미지 | cover 1개 + 씬 이미지 3개 × 4씬 | 13 |
+| 이미지 | cover 1개 + 씬 이미지 2개 × 4씬 | 9 |
 | 오디오 | cover 1개 + 씬 오디오 1개 × 4씬 | 5 |
-| **합계** | | **23** |
+| **합계** | | **19** |
 
 ```javascript
 // 진행률 (%) 계산 예시
@@ -470,7 +462,7 @@ async function playScene(scene) {
       await playAudio(step.audio_url);  // 오디오 완료까지 대기
     }
     if (!step.image_url && !step.audio_url && step.msg) {
-      showSubtitle(step.msg);           // index 4: 대사 자막만 표시
+      showSubtitle(step.msg);           // index 3: 대사 자막만 표시
     }
   }
 }

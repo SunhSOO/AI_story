@@ -125,9 +125,8 @@ outputs/runs/{run_id}/
     cover.png
     scene_01_img_01.png
     scene_01_img_02.png
-    scene_01_img_03.png
     ...
-    scene_04_img_03.png
+    scene_04_img_02.png
   audio/
     scene_01.wav
     scene_02.wav

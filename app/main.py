@@ -21,7 +21,7 @@ logging.basicConfig(
 
 app = FastAPI(
     title="AI Story Generator",
-    description="Local AI storybook generation: 4 scenes × 3 images + TTS",
+    description="Local AI storybook generation: 4 scenes × 2 images + TTS",
     version="3.0.0",
 )
 

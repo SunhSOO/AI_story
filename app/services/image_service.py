@@ -1,4 +1,4 @@
-"""Image generation service: cover(1) + 3 images per scene = 13 total."""
+"""Image generation service: cover(1) + 2 images per scene = 9 total."""
 import random
 from pathlib import Path
 
@@ -102,7 +102,7 @@ def generate_all_images(
     run_dir: Path,
     workflow_path: Path | None = None,
 ) -> dict[int, list[str]]:
-    """Generate 3 images for each of the 4 scenes.
+    """Generate images for each of the 4 scenes.
 
     Returns:
         {scene_no: [filename, ...]} mapping.

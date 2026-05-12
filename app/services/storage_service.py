@@ -122,14 +122,14 @@ def _scene_audio_url(run_id: str, run_dir: Path, scene_no: int) -> str:
 
 
 def _scene_image_delay(run_dir: Path, scene_no: int) -> int:
-    """WAV 재생시간 / 3 반올림. 파일 없거나 읽기 실패 시 1."""
+    """WAV duration divided by the scene image count. Returns 1 on read failure."""
     path = run_dir / "audio" / f"scene_{scene_no:02d}.wav"
     if not path.exists():
         return 1
     try:
         with wave.open(str(path), "rb") as f:
             duration = f.getnframes() / f.getframerate()
-        return max(1, round(duration / 3))
+        return max(1, round(duration / settings.images_per_scene))
     except Exception:
         return 1
 

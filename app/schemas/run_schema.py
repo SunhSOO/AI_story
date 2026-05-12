@@ -3,6 +3,8 @@ from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 
+from app.core.constants import IMAGES_PER_SCENE
+
 
 class RunStatus(str, Enum):
     QUEUED = "QUEUED"
@@ -55,7 +57,7 @@ class SceneInfo(BaseModel):
 
     def to_scenario_info(self) -> SceneScenarioInfo:
         has_audio = bool(self.audio_url)
-        has_all_images = len(self.image_urls) >= 3
+        has_all_images = len(self.image_urls) >= IMAGES_PER_SCENE
 
         if has_audio and has_all_images:
             scene_status = "End"
@@ -64,8 +66,8 @@ class SceneInfo(BaseModel):
         else:
             scene_status = "Pending"
 
-        img_urls = self.image_urls[:3]
-        while len(img_urls) < 3:
+        img_urls = self.image_urls[:IMAGES_PER_SCENE]
+        while len(img_urls) < IMAGES_PER_SCENE:
             img_urls.append("")
 
         d = self.image_delay
@@ -73,8 +75,7 @@ class SceneInfo(BaseModel):
             ScenarioItem(index=0, msg="", audio_url="", image_url=img_urls[0], delay=d),
             ScenarioItem(index=1, msg=self.narration, audio_url=self.audio_url, image_url="", delay=0),
             ScenarioItem(index=2, msg="", audio_url="", image_url=img_urls[1], delay=d),
-            ScenarioItem(index=3, msg="", audio_url="", image_url=img_urls[2], delay=d),
-            ScenarioItem(index=4, msg=self.dialogue, audio_url="", image_url="", delay=0),
+            ScenarioItem(index=3, msg=self.dialogue, audio_url="", image_url="", delay=0),
         ]
 
         return SceneScenarioInfo(

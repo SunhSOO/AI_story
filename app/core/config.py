@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     comfyui_url: str = "http://127.0.0.1:8188"
     comfyui_output_dir: Path = BASE_DIR / "ComfyUI" / "output"
     workflow_path: Path = BASE_DIR / "make_panel.json"
-    images_per_scene: int = 3
+    images_per_scene: int = 2
     image_gen_timeout: int = 300
 
     # voxcpm2 TTS
