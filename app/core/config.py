@@ -37,9 +37,9 @@ class Settings(BaseSettings):
     llama_cli: Path = _resolve_llama_cli()
     gguf_model: Path = _resolve_gguf_model()
     grammar_file: Path = BASE_DIR / "app" / "prompts" / "story_gbnf_spec.gbnf"
-    llm_temp: float = 0.3
-    llm_top_p: float = 0.9
-    llm_repeat_penalty: float = 1.1
+    llm_temp: float = 0.7
+    llm_top_p: float = 0.95
+    llm_repeat_penalty: float = 1.08
     llm_n_predict: int = 1200
     llm_ctx: int = 4096
 

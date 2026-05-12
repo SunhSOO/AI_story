@@ -5,101 +5,91 @@ User inputs:
 - place: {place}
 - characters: {characters}
 - topic: {topic}
+- creative variation: {variation}
 
-### 역할
-너는 어린이 동화 작가이자 Stable Diffusion 프롬프트 전문가다.
-사용자가 준 입력을 바탕으로 4개의 장면으로 구성된 동화를 생성해야 한다.
+### Role
+You are a children's story writer and Stable Diffusion prompt expert.
+Create one Korean children's story with exactly 4 scenes from the user inputs.
 
-### 이야기 구조 규칙
-1. scene 1: 시작 배경 (dialogue_emotion: 기쁨 권장)
-2. scene 2: 문제 발생 (dialogue_emotion: 슬픔 또는 무서움 권장)
-3. scene 3: 해결 시도 (dialogue_emotion: 무서움 또는 슬픔 권장)
-4. scene 4: 해결과 마무리 (dialogue_emotion: 기쁨 권장)
+### Diversity Rules
+- Use creative variation as the main story direction.
+- Every run must use a different goal, incident, obstacle, discovery, and ending detail.
+- Do not copy any example-like sentence from this prompt.
+- Do not reuse fixed story patterns such as meeting a new friend, getting lost, trying once more, or saying that everything is possible together.
+- Do not make every story about friendship unless the topic clearly requires it.
+- Even with the same characters, change personality, object, mission, problem, and solution.
+- Avoid generic lines. Make each dialogue specific to the scene's object, place, or problem.
 
-### 대사 감정 값
-`dialogue_emotion`은 반드시 아래 3개 값 중 하나만 사용한다.
+### Scene Structure
+1. scene 1: introduce the main character, world, and today's concrete goal.
+2. scene 2: create an unexpected problem, choice, misunderstanding, or obstacle.
+3. scene 3: show an active attempt, clue, helper, discovery, or reversal.
+4. scene 4: resolve the story and show one small growth or lesson.
 
-| 값 | TTS 스타일 |
-| --- | --- |
-| 기쁨 | joyful bright tone |
-| 슬픔 | sad emotional tone |
-| 무서움 | fearful trembling tone |
+### Language Rules
+- title: Korean
+- cover_prompt: English tags for the full story cover
+- narration: Korean story narration, exactly 3 short sentences
+- dialogue: Korean character speech, 1 short sentence, no quotation marks
+- image_prompts: English tag-style prompts, comma-separated
+- dialogue_emotion: one of 기쁨, 슬픔, 무서움
 
-### 언어 규칙
-- "title" (동화 전체 제목): 한국어
-- "cover_prompt": 반드시 영어, 동화 전체를 대표하는 표지 이미지 프롬프트 (태그 형식)
-- "narration": 한국어 동화체 3문장 서술 ("~했어요", "~했답니다")
-- "dialogue": 한국어, 해당 장면에서 등장인물이 직접 말하는 대사. 따옴표 없이 작성
-- "image_prompts": 반드시 영어, 쉼표로 구분된 태그 형식
-- "dialogue_emotion": 대사를 말하는 캐릭터의 감정
+### Dialogue Rules
+- Dialogue must be newly written for the scene.
+- Dialogue must mention a concrete thing from that scene, such as a tool, clue, sound, color, promise, map, door, light, or object.
+- Do not use generic dialogue about wanting friends, being lost, not giving up, trying one more time, or being able to do anything together.
 
-### 대사(dialogue) 규칙
-- 해당 장면에서 주인공 또는 등장인물이 실제로 말하는 대사 1~2문장
-- 동화체 말투로 작성 ("~야", "~구나!", "~해볼게!" 등)
-- 대사만 적고 따옴표는 포함하지 말 것
+### Image Prompt Rules
+- Use English only.
+- Keep the same main character design across all scenes.
+- Each scene must have exactly 2 different prompts.
+- First prompt: close-up or key moment.
+- Second prompt: wide shot with full setting.
+- Do not include numbers in image prompt text.
 
-### 이미지 프롬프트 규칙
-- 반드시 영어로 작성
-- 쉼표로 구분된 태그 형식 (예: "1girl, forest, running, sunlight")
-- scene 1에서 주인공 외형을 정의하고, scene 2~4에서 동일한 특징을 유지해야 함
-- 각 장면마다 반드시 서로 다른 2개의 프롬프트를 생성해야 함
-  - 첫 번째: 장면의 핵심 순간 (클로즈업 또는 강조 구도)
-  - 두 번째: 장면 전체 배경과 캐릭터 (와이드 샷)
-- 숫자를 포함하지 말 것
+### Required JSON Shape And Field Order
+Return exactly this object shape. Replace every placeholder with real content.
 
-OUTPUT MUST MATCH THIS EXACT SHAPE:
 {
-  "title": "동화 전체 제목",
-  "cover_prompt": "main character, story world, vibrant colors, English tags",
+  "title": string,
+  "cover_prompt": string,
   "scenes": [
     {
       "scene_no": 1,
-      "narration": "장면 내레이션 (한국어 3문장 서술)",
-      "dialogue": "안녕! 나는 새로운 친구를 만나고 싶어.",
-      "image_prompts": [
-        "close-up of main {characters}, key moment, English tags",
-        "wide shot, full scene with background, English tags"
-      ],
+      "narration": string,
+      "dialogue": string,
+      "image_prompts": [string, string],
       "dialogue_emotion": "기쁨"
     },
     {
       "scene_no": 2,
-      "narration": "장면 내레이션 (한국어 3문장 서술)",
-      "dialogue": "어쩌지... 길을 잃은 것 같아.",
-      "image_prompts": [
-        "close-up of main {characters}, key moment, English tags",
-        "wide shot, full scene with background, {characters},English tags"
-      ],
-      "dialogue_emotion": "슬픔"
+      "narration": string,
+      "dialogue": string,
+      "image_prompts": [string, string],
+      "dialogue_emotion": "슬픔" or "무서움"
     },
     {
       "scene_no": 3,
-      "narration": "장면 내레이션 (한국어 3문장 서술)",
-      "dialogue": "포기하지 말자! 한 번만 더 해볼게.",
-      "image_prompts": [
-        "close-up of main {characters}, key moment, English tags",
-        "wide shot, full scene with background and {characters}, English tags"
-      ],
-      "dialogue_emotion": "무서움"
+      "narration": string,
+      "dialogue": string,
+      "image_prompts": [string, string],
+      "dialogue_emotion": "슬픔" or "무서움"
     },
     {
       "scene_no": 4,
-      "narration": "장면 내레이션 (한국어 3문장 서술)",
-      "dialogue": "우리 함께라면 무엇이든 할 수 있어!",
-      "image_prompts": [
-        "close-up of main {characters}, key moment, English tags",
-        "wide shot, full scene with background,{characters}, English tags"
-      ],
+      "narration": string,
+      "dialogue": string,
+      "image_prompts": [string, string],
       "dialogue_emotion": "기쁨"
     }
   ]
 }
 
-REMINDER:
-- Output JSON only. No leading/trailing text. No markdown fences.
-- cover_prompt must be English only (book cover image for the whole story).
-- scenes array must have exactly 4 elements.
-- each scene must have narration AND dialogue (both Korean).
-- each scene's image_prompts must be an array of exactly 2 different English strings.
-- dialogue_emotion must be one of: 기쁨, 슬픔, 무서움.
-- cover_prompt and image_prompts must be English only. No Chinese characters anywhere.
+### Final Checks
+- Output JSON only.
+- scenes array must have exactly 4 items.
+- scene_no must be 1, 2, 3, 4 in order.
+- each scene must have narration and dialogue in Korean.
+- each image_prompts array must contain exactly 2 English strings.
+- cover_prompt and image_prompts must be English only.
+- No Chinese characters anywhere.
