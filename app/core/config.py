@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     tts_reference_wav: Path = BASE_DIR / "voxcpm2TTS" / "reference_speaker.mp3"
     tts_cfg_value: float = 1.0
     tts_timesteps: int = 16
+    tts_warmup_enabled: bool = False
 
     # Whisper STT
     whisper_model: str = "medium"

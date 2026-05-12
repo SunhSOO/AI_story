@@ -1,7 +1,7 @@
 """Worker server (5080): exposes LLM generation, ComfyUI image generation, and TTS via HTTP API."""
 import asyncio
 import gc
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -59,8 +59,16 @@ async def image_generate(req: ImageRequest):
 async def tts_generate(req: TTSRequest):
     loop = asyncio.get_event_loop()
     from app.clients.voxcpm2_client import get_tts_executor
-    wav_bytes = await loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req)
-    return Response(content=wav_bytes, media_type="audio/wav")
+    try:
+        wav_bytes = await loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req)
+        return Response(content=wav_bytes, media_type="audio/wav")
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"TTS scene={req.scene_no} failed: {type(exc).__name__}: {exc}",
+        ) from exc
 
 
 @app.post("/tts/unload")
@@ -107,7 +115,10 @@ def _generate_tts_bytes(req: TTSRequest) -> bytes:
         audio_dir.mkdir()
         output_path = audio_dir / f"scene_{req.scene_no:02d}.wav"
 
-        print(f"[WORKER TTS] start scene={req.scene_no}")
+        print(
+            f"[WORKER TTS] start scene={req.scene_no} "
+            f"narration_len={len(req.narration)} dialogue_len={len(req.dialogue)}"
+        )
         if req.dialogue:
             synthesize_narration_dialogue(
                 narration=req.narration,

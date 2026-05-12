@@ -53,19 +53,28 @@ class WorkerClient:
         narration_emotion: str,
         dialogue_emotion: str,
     ) -> bytes:
-        async with aiohttp.ClientSession(timeout=_TTS_TIMEOUT) as session:
-            async with session.post(
-                f"{self.base_url}/tts/generate",
-                json={
-                    "scene_no": scene_no,
-                    "narration": narration,
-                    "dialogue": dialogue,
-                    "narration_emotion": narration_emotion,
-                    "dialogue_emotion": dialogue_emotion,
-                },
-            ) as resp:
-                resp.raise_for_status()
-                return await resp.read()
+        try:
+            async with aiohttp.ClientSession(timeout=_TTS_TIMEOUT) as session:
+                async with session.post(
+                    f"{self.base_url}/tts/generate",
+                    json={
+                        "scene_no": scene_no,
+                        "narration": narration,
+                        "dialogue": dialogue,
+                        "narration_emotion": narration_emotion,
+                        "dialogue_emotion": dialogue_emotion,
+                    },
+                ) as resp:
+                    if resp.status >= 400:
+                        body = await resp.text()
+                        raise RuntimeError(
+                            f"Worker TTS HTTP {resp.status} scene={scene_no}: {body[:500]}"
+                        )
+                    return await resp.read()
+        except Exception as exc:
+            raise RuntimeError(
+                f"Worker TTS request failed scene={scene_no}: {type(exc).__name__}: {exc!r}"
+            ) from exc
 
     async def generate_cover_tts(self, title: str) -> bytes:
         return await self.generate_tts(

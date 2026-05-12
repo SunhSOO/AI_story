@@ -277,9 +277,10 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
     except Exception as exc:
         import traceback
         traceback.print_exc()
+        error = f"{type(exc).__name__}: {exc!r}"
         run_state.status = RunStatus.FAILED
-        run_state.error = str(exc)
-        await _emit(run_state, {"error": str(exc)})
+        run_state.error = error
+        await _emit(run_state, {"error": error})
 
     finally:
         if not cleanup_done:

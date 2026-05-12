@@ -186,7 +186,10 @@ def _generate_wav(text: str, emotion: str | None, ref_wav: Path):
         raise TTSError("TTS text is empty after sanitization")
 
     model = _get_model()
-    _warm_up_model(model, ref_wav)
+    if settings.tts_warmup_enabled:
+        _warm_up_model(model, ref_wav)
+
+    print(f"[TTS] generate chars={len(tts_text)} preview={tts_text[:80]}")
     try:
         wav = _run_model_generate(model, tts_text, ref_wav)
     except Exception as e:
@@ -224,5 +227,11 @@ def synthesize_narration_dialogue(
         raise TTSError(f"TTS reference WAV not found: {ref_wav}")
 
     scene_text = _join_clean_tts_text(narration, dialogue)
+    print(
+        "[TTS] scene text prepared "
+        f"narration_chars={len(_clean_tts_text(narration))} "
+        f"dialogue_chars={len(_clean_tts_text(dialogue))} "
+        f"total_chars={len(scene_text)}"
+    )
     wav, sr = _generate_wav(scene_text, emotion=None, ref_wav=ref_wav)
     _write_wav(output_path, wav, sr)
