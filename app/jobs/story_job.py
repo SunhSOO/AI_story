@@ -264,7 +264,12 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
             await loop.run_in_executor(None, _local_cuda_cleanup)
 
-        await asyncio.gather(_worker_branch(), _local_branch())
+        branch_results = await asyncio.gather(
+            _worker_branch(), _local_branch(), return_exceptions=True
+        )
+        branch_errors = [r for r in branch_results if isinstance(r, BaseException)]
+        if branch_errors:
+            raise branch_errors[0]
 
         await _cleanup_system("generation-complete VRAM cleanup", worker=worker)
         cleanup_done = True

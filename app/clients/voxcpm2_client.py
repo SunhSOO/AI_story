@@ -16,7 +16,7 @@ _ALLOWED_TTS_PUNCTUATION = {"?"}
 _PEAK_CEILING = 0.95
 _TARGET_RMS = 10 ** (-20 / 20)
 _WAV_EPSILON = 1e-8
-_TTS_WARMUP_TEXT = "옛날 옛적에 작은 마을에 용감한 소년이 살고 있었습니다."
+_TTS_WARMUP_TEXT = "옛날 옛적에 작은 마을에 용감한 소년이 살고 있었습니다. 어느 날 소년은 신비로운 숲 속에서 길을 잃고 말았습니다. 두려웠지만 포기하지 않고 앞으로 나아갔습니다."
 
 
 def _is_tts_text_char(ch: str) -> bool:
