@@ -130,11 +130,11 @@ async def tts_generate(req: TTSRequest):
 @app.post("/tts/batch")
 async def tts_batch_generate(req: TTSBatchRequest):
     """여러 TTS를 한 번에 생성 (narration/dialogue 분할).
-    
+
     반환 형식: {"scene_no_0": base64_wav, "scene_no_1": base64_wav, ...}
       - scene_no_0: narration WAV
       - scene_no_1: dialogue WAV (dialogue가 비어있으면 키 없음)
-    
+
     완료 후 자동으로 모델을 언로드하여 VRAM 해제.
     """
     loop = asyncio.get_event_loop()
@@ -144,36 +144,56 @@ async def tts_batch_generate(req: TTSBatchRequest):
     batch_start = time.time()
     print(f"[WORKER TTS BATCH] start items={len(req.items)} timeout={total_timeout}s")
 
-    try:
-        results = await asyncio.wait_for(
-            loop.run_in_executor(
-                get_tts_executor(),
-                _generate_tts_bytes_batch_split,
-                req.items,
-            ),
-            timeout=total_timeout,
-        )
-    except asyncio.TimeoutError:
-        reset_tts_executor()
+    results = None
+    for attempt in range(2):
         try:
-            await loop.run_in_executor(None, _unload_tts)
-        except Exception as e:
-            print(f"[WORKER TTS BATCH] unload after timeout failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"TTS batch timed out after {total_timeout}s",
-        )
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        try:
-            await loop.run_in_executor(None, _unload_tts)
-        except Exception as e:
-            print(f"[WORKER TTS BATCH] unload after failure failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"TTS batch failed: {type(exc).__name__}: {exc}",
-        ) from exc
+            results = await asyncio.wait_for(
+                loop.run_in_executor(
+                    get_tts_executor(),
+                    _generate_tts_bytes_batch_split,
+                    req.items,
+                ),
+                timeout=total_timeout,
+            )
+            break
+        except AssertionError as exc:
+            # torch.compile / CUDA graph TLS 충돌 — executor 리셋 후 1회 재시도
+            print(
+                f"[WORKER TTS BATCH] AssertionError attempt={attempt}: {exc!r}"
+                + (" → resetting executor and retrying" if attempt == 0 else " → giving up")
+            )
+            reset_tts_executor()
+            if attempt == 0:
+                continue
+            try:
+                await loop.run_in_executor(None, _unload_tts)
+            except Exception as e:
+                print(f"[WORKER TTS BATCH] unload after AssertionError failed: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"TTS batch AssertionError after retry: {exc}",
+            ) from exc
+        except asyncio.TimeoutError:
+            reset_tts_executor()
+            try:
+                await loop.run_in_executor(None, _unload_tts)
+            except Exception as e:
+                print(f"[WORKER TTS BATCH] unload after timeout failed: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"TTS batch timed out after {total_timeout}s",
+            )
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            try:
+                await loop.run_in_executor(None, _unload_tts)
+            except Exception as e:
+                print(f"[WORKER TTS BATCH] unload after failure failed: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"TTS batch failed: {type(exc).__name__}: {exc}",
+            ) from exc
 
     # 성공 시 TTS 모델 언로드 → VRAM 해제
     unload_start = time.time()
