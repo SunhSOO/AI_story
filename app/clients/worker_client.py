@@ -5,7 +5,7 @@ from app.schemas.story_schema import StorySchema
 
 _LLM_TIMEOUT = aiohttp.ClientTimeout(total=900)
 _IMG_TIMEOUT = aiohttp.ClientTimeout(total=300)
-_TTS_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=1800)
+_TTS_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=720)
 _CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=120)
 
 

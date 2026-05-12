@@ -16,7 +16,7 @@ _ALLOWED_TTS_PUNCTUATION = {"?"}
 _PEAK_CEILING = 0.95
 _TARGET_RMS = 10 ** (-20 / 20)
 _WAV_EPSILON = 1e-8
-_TTS_WARMUP_TEXT = "안녕하세요"
+_TTS_WARMUP_TEXT = "옛날 옛적에 작은 마을에 용감한 소년이 살고 있었습니다."
 
 
 def _is_tts_text_char(ch: str) -> bool:
@@ -90,6 +90,17 @@ def get_tts_executor() -> concurrent.futures.ThreadPoolExecutor:
                 max_workers=1, thread_name_prefix="tts-worker"
             )
     return _tts_executor
+
+
+def reset_tts_executor() -> None:
+    """hang된 TTS 스레드를 버리고 새 executor를 생성."""
+    global _tts_executor, _tts_warmed_up
+    with _tts_executor_lock:
+        _tts_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="tts-worker"
+        )
+        _tts_warmed_up = False
+    print("[TTS] executor reset (previous thread abandoned)")
 
 
 def unload_model() -> None:
@@ -173,10 +184,10 @@ def _warm_up_model(model, ref_wav: Path) -> None:
             return
         try:
             _run_model_generate(model, _TTS_WARMUP_TEXT, ref_wav)
+            print("[TTS] voxcpm2 warmup done")
         except Exception as e:
-            raise TTSError(f"voxcpm2 warmup failed: {e}") from e
+            print(f"[TTS] warmup failed (continuing without warmup): {e}")
         _tts_warmed_up = True
-        print("[TTS] voxcpm2 warmup done")
 
 
 def _generate_wav(text: str, emotion: str | None, ref_wav: Path):

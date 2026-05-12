@@ -55,14 +55,25 @@ async def image_generate(req: ImageRequest):
     return Response(content=img_bytes, media_type="image/png")
 
 
+_TTS_SCENE_TIMEOUT = 660
+
 @app.post("/tts/generate")
 async def tts_generate(req: TTSRequest):
     loop = asyncio.get_event_loop()
-    from app.clients.voxcpm2_client import get_tts_executor
+    from app.clients.voxcpm2_client import get_tts_executor, reset_tts_executor
     try:
-        wav_bytes = await loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req)
+        wav_bytes = await asyncio.wait_for(
+            loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req),
+            timeout=_TTS_SCENE_TIMEOUT,
+        )
         print(f"[WORKER TTS] response scene={req.scene_no} bytes={len(wav_bytes)}")
         return Response(content=wav_bytes, media_type="audio/wav")
+    except asyncio.TimeoutError:
+        reset_tts_executor()
+        raise HTTPException(
+            status_code=500,
+            detail=f"TTS scene={req.scene_no} timed out after {_TTS_SCENE_TIMEOUT}s",
+        )
     except Exception as exc:
         import traceback
         traceback.print_exc()
