@@ -109,7 +109,7 @@ def _log_cuda_memory(label: str) -> None:
 def _cleanup_after_tts(label: str) -> None:
     gc.collect()
     if not settings.tts_cleanup_each_scene:
-        _log_cuda_memory(f"{label} no-cleanup")
+        _log_cuda_memory(f"{label} gc-only")
         return
     try:
         import torch

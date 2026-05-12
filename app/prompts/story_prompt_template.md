@@ -51,7 +51,7 @@ Create one Korean children's story with exactly 4 scenes from the user inputs.
 Return exactly this object shape. Replace every placeholder with real content.
 
 {
-  "title": string,
+  "title": string, include topic
   "cover_prompt": string,
   "scenes": [
     {
