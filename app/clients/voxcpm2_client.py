@@ -221,22 +221,12 @@ def _get_model():
 
 
 def _run_model_generate(model, text: str, ref_wav: Path):
-    try:
-        import torch
-        with torch.inference_mode():
-            return model.generate(
-                text=text,
-                reference_wav_path=str(ref_wav),
-                cfg_value=settings.tts_cfg_value,
-                inference_timesteps=settings.tts_timesteps,
-            )
-    except ImportError:
-        return model.generate(
-            text=text,
-            reference_wav_path=str(ref_wav),
-            cfg_value=settings.tts_cfg_value,
-            inference_timesteps=settings.tts_timesteps,
-        )
+    return model.generate(
+        text=text,
+        reference_wav_path=str(ref_wav),
+        cfg_value=settings.tts_cfg_value,
+        inference_timesteps=settings.tts_timesteps,
+    )
 
 
 def _warm_up_model(model, ref_wav: Path) -> None:
