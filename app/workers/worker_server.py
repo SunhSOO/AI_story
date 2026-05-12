@@ -74,35 +74,50 @@ async def _maybe_unload_tts_after_request(scene_no: int) -> None:
 async def tts_generate(req: TTSRequest):
     loop = asyncio.get_event_loop()
     from app.clients.voxcpm2_client import get_tts_executor, reset_tts_executor
-    try:
-        wav_bytes = await asyncio.wait_for(
-            loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req),
-            timeout=_TTS_SCENE_TIMEOUT,
-        )
-        await _maybe_unload_tts_after_request(req.scene_no)
-        print(f"[WORKER TTS] response scene={req.scene_no} bytes={len(wav_bytes)}")
-        return Response(content=wav_bytes, media_type="audio/wav")
-    except asyncio.TimeoutError:
-        reset_tts_executor()
+
+    for attempt in range(2):
         try:
+            wav_bytes = await asyncio.wait_for(
+                loop.run_in_executor(get_tts_executor(), _generate_tts_bytes, req),
+                timeout=_TTS_SCENE_TIMEOUT,
+            )
             await _maybe_unload_tts_after_request(req.scene_no)
-        except Exception as cleanup_exc:
-            print(f"[WORKER TTS] unload after timeout failed: {cleanup_exc}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"TTS scene={req.scene_no} timed out after {_TTS_SCENE_TIMEOUT}s",
-        )
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        try:
-            await _maybe_unload_tts_after_request(req.scene_no)
-        except Exception as cleanup_exc:
-            print(f"[WORKER TTS] unload after failure failed: {cleanup_exc}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"TTS scene={req.scene_no} failed: {type(exc).__name__}: {exc}",
-        ) from exc
+            print(f"[WORKER TTS] response scene={req.scene_no} bytes={len(wav_bytes)}")
+            return Response(content=wav_bytes, media_type="audio/wav")
+        except AssertionError as exc:
+            # torch.compile / CUDA graph TLS 충돌 — executor 리셋 후 1회 재시도
+            print(
+                f"[WORKER TTS] AssertionError scene={req.scene_no} attempt={attempt}: {exc!r}"
+                + (" → resetting executor and retrying" if attempt == 0 else " → giving up")
+            )
+            reset_tts_executor()
+            if attempt == 0:
+                continue
+            raise HTTPException(
+                status_code=500,
+                detail=f"TTS scene={req.scene_no} AssertionError after retry: {exc}",
+            ) from exc
+        except asyncio.TimeoutError:
+            reset_tts_executor()
+            try:
+                await _maybe_unload_tts_after_request(req.scene_no)
+            except Exception as cleanup_exc:
+                print(f"[WORKER TTS] unload after timeout failed: {cleanup_exc}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"TTS scene={req.scene_no} timed out after {_TTS_SCENE_TIMEOUT}s",
+            )
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            try:
+                await _maybe_unload_tts_after_request(req.scene_no)
+            except Exception as cleanup_exc:
+                print(f"[WORKER TTS] unload after failure failed: {cleanup_exc}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"TTS scene={req.scene_no} failed: {type(exc).__name__}: {exc}",
+            ) from exc
 
 
 @app.post("/tts/unload")
@@ -187,19 +202,9 @@ def _unload_tts() -> None:
     import gc
     from app.clients.voxcpm2_client import unload_model
 
+    # CUDA cleanup은 unload_model() 내부에서 TTS 스레드 안에 실행됨
     unload_model()
     gc.collect()
-
-    try:
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
-            torch.cuda.ipc_collect()
-            torch.cuda.reset_peak_memory_stats()
-    except Exception as e:
-        raise RuntimeError(f"TTS CUDA cleanup failed: {e}") from e
-
     print("[WORKER] TTS model unloaded from VRAM")
 
 

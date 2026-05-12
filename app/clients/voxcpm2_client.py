@@ -150,45 +150,48 @@ def reset_tts_executor() -> None:
 
 
 def unload_model() -> None:
-    """TTS executor를 종료하고 VRAM에서 voxcpm2 모델을 해제."""
+    """TTS 스레드 안에서 모델·CUDA를 정리한 뒤 executor를 종료."""
     import gc
     global _tts_executor, _tts_warmed_up
 
-    # executor 종료 — wait=True로 스레드가 완전히 종료될 때까지 대기
+    def _do_unload_in_tts_thread() -> None:
+        """TTS 스레드(= CUDA 컨텍스트 소유 스레드)에서 실행."""
+        try:
+            ml = sys.modules.get('model_loader')
+            if ml is not None and getattr(ml, '_model', None) is not None:
+                model = ml._model
+                try:
+                    if hasattr(model, "to"):
+                        model.to("cpu")
+                except Exception as e:
+                    print(f"[TTS] model.to('cpu') skipped: {e}")
+                ml._model = None
+                del model
+                print("[TTS] voxcpm2 model unloaded from VRAM")
+        except Exception as e:
+            print(f"[TTS] model unload: {e}")
+
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+                torch.cuda.reset_peak_memory_stats()
+                print("[TTS] CUDA cache cleared")
+        except Exception as e:
+            print(f"[TTS] CUDA cleanup: {e}")
+
     with _tts_executor_lock:
         if _tts_executor is not None:
+            future = _tts_executor.submit(_do_unload_in_tts_thread)
+            try:
+                future.result(timeout=60)
+            except Exception as e:
+                print(f"[TTS] in-thread unload failed: {e}")
             _tts_executor.shutdown(wait=True)
             _tts_executor = None
         _tts_warmed_up = False
-
-    # model_loader 싱글톤(_model) 해제
-    try:
-        ml = sys.modules.get('model_loader')
-        if ml is not None and getattr(ml, '_model', None) is not None:
-            model = ml._model
-            try:
-                if hasattr(model, "to"):
-                    model.to("cpu")
-            except Exception as e:
-                print(f"[TTS] model move to CPU skipped: {e}")
-            ml._model = None
-            del model
-            print("[TTS] voxcpm2 model unloaded from VRAM")
-    except Exception as e:
-        print(f"[TTS] model unload: {e}")
-
-    # CUDA 메모리 강제 반환 — del만으로는 allocator 캐시가 남음
-    try:
-        gc.collect()
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
-            torch.cuda.ipc_collect()
-            torch.cuda.reset_peak_memory_stats()
-            print("[TTS] CUDA cache cleared")
-    except Exception as e:
-        print(f"[TTS] CUDA cleanup: {e}")
 
 
 def _patch_tqdm() -> None:

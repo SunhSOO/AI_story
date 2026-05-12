@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     tts_timesteps: int = 14
     tts_warmup_enabled: bool = False
     tts_cleanup_each_scene: bool = False
-    tts_unload_after_each_request: bool = True
+    tts_unload_after_each_request: bool = False
     tts_vram_log_enabled: bool = True
 
     # Whisper STT
