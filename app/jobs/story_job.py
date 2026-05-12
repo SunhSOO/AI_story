@@ -141,46 +141,41 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
         base_seed = story_seed
 
-        # Branch A (5080 Worker): batch TTS (split) + assigned images
+        # Branch A (5080 Worker): per-scene TTS (split) + assigned images
         async def _worker_branch():
-            # ── TTS: 배치 요청으로 cover + 모든 scene 한번에 생성 (narration/dialogue 분할) ──
+            # ── TTS: per-scene /tts/generate 호출로 narration/dialogue 분할 생성 ──
+            # 각 호출은 raw audio/wav 바이트를 반환하므로 base64 JSON으로 인한 응답 stall이 없다.
             tts_started_at = time.time()
-            print("[WORKER] TTS batch on 5080 (cover + scenes, narration/dialogue split)...")
+            print("[WORKER] TTS per-scene on 5080 (cover + scenes, narration/dialogue split)...")
 
-            # 배치 아이템 구성
-            tts_items = [
-                {
-                    "scene_no": 0,
-                    "narration": story.title,
-                    "dialogue": "",
-                    "narration_emotion": "",
-                    "dialogue_emotion": "",
-                },
-            ]
-            for scene in story.scenes:
-                tts_items.append({
-                    "scene_no": scene.scene_no,
-                    "narration": scene.narration,
-                    "dialogue": scene.dialogue,
-                    "narration_emotion": "",
-                    "dialogue_emotion": "",
-                })
+            async def _request_and_write(
+                scene_no: int,
+                narration: str,
+                dialogue: str,
+                output_filename: str,
+            ) -> Path | None:
+                try:
+                    wav_bytes = await worker.generate_tts(
+                        scene_no=scene_no,
+                        narration=narration,
+                        dialogue=dialogue,
+                        narration_emotion="",
+                        dialogue_emotion="",
+                    )
+                except Exception as exc:
+                    print(f"[WORKER TTS] {output_filename} failed (non-fatal): {exc!r}")
+                    return None
+                output_path = run_dir / "audio" / output_filename
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_bytes(wav_bytes)
+                return output_path
 
-            # 배치 TTS 실행 — 실패해도 이미지 생성은 계속 진행
-            tts_results: dict[str, bytes] = {}
-            try:
-                tts_results = await worker.generate_tts_batch(tts_items)
-                print(f"[WORKER] TTS batch done in {time.time() - tts_started_at:.1f}s")
-            except Exception as tts_exc:
-                print(f"[WORKER] TTS batch failed (non-fatal, continuing to images): {tts_exc!r}")
-
-            # ── Cover audio (0_0) ──
-            cover_key = "0_0"
-            if cover_key in tts_results:
-                cover_audio = "cover.wav"
-                cover_audio_path = run_dir / "audio" / cover_audio
-                cover_audio_path.parent.mkdir(parents=True, exist_ok=True)
-                cover_audio_path.write_bytes(tts_results[cover_key])
+            # ── Cover audio ──
+            cover_audio = "cover.wav"
+            cover_path = await _request_and_write(
+                scene_no=0, narration=story.title, dialogue="", output_filename=cover_audio,
+            )
+            if cover_path is not None:
                 run_state.set_cover_audio(cover_audio)
                 await _emit(
                     run_state,
@@ -194,15 +189,16 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
             # ── Scene audio (_0=narration, _1=dialogue) ──
             for scene in story.scenes:
                 scene_no = scene.scene_no
-                narr_key = f"{scene_no}_0"
-                dial_key = f"{scene_no}_1"
 
                 # narration audio (_0)
-                if narr_key in tts_results:
-                    narr_filename = f"scene_{scene_no:02d}_0.wav"
-                    narr_path = run_dir / "audio" / narr_filename
-                    narr_path.parent.mkdir(parents=True, exist_ok=True)
-                    narr_path.write_bytes(tts_results[narr_key])
+                narr_filename = f"scene_{scene_no:02d}_0.wav"
+                narr_path = await _request_and_write(
+                    scene_no=scene_no,
+                    narration=scene.narration,
+                    dialogue="",
+                    output_filename=narr_filename,
+                )
+                if narr_path is not None:
                     image_delay = _wav_image_delay(narr_path)
                     run_state.set_scene_audio(scene_no, narr_filename, image_delay)
                     await _emit(
@@ -215,22 +211,33 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                     )
                     print(f"[WORKER] TTS scene {scene_no} narration applied → {narr_filename}")
 
-                # dialogue audio (_1)
-                if dial_key in tts_results:
+                # dialogue audio (_1) — dialogue가 있을 때만 별도 호출
+                if scene.dialogue:
                     dial_filename = f"scene_{scene_no:02d}_1.wav"
-                    dial_path = run_dir / "audio" / dial_filename
-                    dial_path.parent.mkdir(parents=True, exist_ok=True)
-                    dial_path.write_bytes(tts_results[dial_key])
-                    run_state.set_scene_dialogue_audio(scene_no, dial_filename)
-                    await _emit(
-                        run_state,
-                        {
-                            "scene_no": scene_no,
-                            "dialogue_audio": dial_filename,
-                            "dialogue_audio_url": f"/api/runs/{run_state.run_id}/audio/{dial_filename}",
-                        },
+                    dial_path = await _request_and_write(
+                        scene_no=scene_no,
+                        narration="",
+                        dialogue=scene.dialogue,
+                        output_filename=dial_filename,
                     )
-                    print(f"[WORKER] TTS scene {scene_no} dialogue applied → {dial_filename}")
+                    if dial_path is not None:
+                        run_state.set_scene_dialogue_audio(scene_no, dial_filename)
+                        await _emit(
+                            run_state,
+                            {
+                                "scene_no": scene_no,
+                                "dialogue_audio": dial_filename,
+                                "dialogue_audio_url": f"/api/runs/{run_state.run_id}/audio/{dial_filename}",
+                            },
+                        )
+                        print(f"[WORKER] TTS scene {scene_no} dialogue applied → {dial_filename}")
+
+            # TTS 모두 끝났으니 모델 언로드해서 ComfyUI 위한 VRAM 확보
+            try:
+                await worker.unload_tts()
+                print(f"[WORKER] TTS unload done (all per-scene in {time.time() - tts_started_at:.1f}s)")
+            except Exception as unload_exc:
+                print(f"[WORKER] TTS unload failed (continuing to images): {unload_exc!r}")
 
             # ── 이미지 생성 (TTS VRAM은 이미 해제된 상태) ──
             for scene_no, img_idxs in _WORKER_IMAGES.items():
