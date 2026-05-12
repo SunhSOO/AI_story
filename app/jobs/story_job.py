@@ -85,7 +85,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
     """Dual-machine pipeline:
       Stage 1: LLM on 5080 worker
       Stage 2 (parallel):
-        Branch A (worker): cover TTS, all scene TTS, assigned scene images
+        Branch A (worker): batch TTS (cover + scenes) with auto VRAM release, then assigned scene images
         Branch B (local): cover image, assigned scene images
     """
     from app.clients.worker_client import WorkerClient
@@ -134,59 +134,73 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
         base_seed = story_seed
 
-        # Branch A (5080 Worker): all TTS plus assigned images
+        # Branch A (5080 Worker): batch TTS + assigned images
         async def _worker_branch():
-            print("[WORKER] TTS cover on 5080...")
+            # ── TTS: 배치 요청으로 cover + 모든 scene 한번에 생성 ──
             tts_started_at = time.time()
-            cover_audio_bytes = await worker.generate_cover_tts(story.title)
-            cover_audio = "cover.wav"
-            cover_audio_path = run_dir / "audio" / cover_audio
-            cover_audio_path.parent.mkdir(parents=True, exist_ok=True)
-            cover_audio_path.write_bytes(cover_audio_bytes)
-            run_state.set_cover_audio(cover_audio)
-            await _emit(
-                run_state,
-                {
-                    "cover_audio": cover_audio,
-                    "cover_audio_url": f"/api/runs/{run_state.run_id}/audio/{cover_audio}",
-                },
-            )
-            print("[WORKER] TTS cover done")
+            print("[WORKER] TTS batch on 5080 (cover + scenes)...")
 
+            # 배치 아이템 구성
+            tts_items = [
+                {
+                    "scene_no": 0,
+                    "narration": story.title,
+                    "dialogue": "",
+                    "narration_emotion": "",
+                    "dialogue_emotion": "",
+                },
+            ]
             for scene in story.scenes:
-                scene_no = scene.scene_no
-                print(f"[WORKER] TTS scene {scene_no} on 5080...")
-                scene_tts_started_at = time.time()
-                wav_bytes = await worker.generate_tts(
-                    scene_no=scene_no,
-                    narration=scene.narration,
-                    dialogue=scene.dialogue,
-                    narration_emotion="",
-                    dialogue_emotion="",
-                )
-                filename = f"scene_{scene_no:02d}.wav"
-                audio_path = run_dir / "audio" / filename
-                audio_path.parent.mkdir(parents=True, exist_ok=True)
-                audio_path.write_bytes(wav_bytes)
-                image_delay = _wav_image_delay(audio_path)
-                run_state.set_scene_audio(scene_no, filename, image_delay)
+                tts_items.append({
+                    "scene_no": scene.scene_no,
+                    "narration": scene.narration,
+                    "dialogue": scene.dialogue,
+                    "narration_emotion": "",
+                    "dialogue_emotion": "",
+                })
+
+            # 배치 TTS 실행 (완료 후 서버측에서 자동으로 TTS 모델 언로드 + VRAM 해제)
+            tts_results = await worker.generate_tts_batch(tts_items)
+            print(f"[WORKER] TTS batch done in {time.time() - tts_started_at:.1f}s")
+
+            # ── 결과를 run_state에 반영 ──
+            # Cover audio
+            if 0 in tts_results:
+                cover_audio = "cover.wav"
+                cover_audio_path = run_dir / "audio" / cover_audio
+                cover_audio_path.parent.mkdir(parents=True, exist_ok=True)
+                cover_audio_path.write_bytes(tts_results[0])
+                run_state.set_cover_audio(cover_audio)
                 await _emit(
                     run_state,
                     {
-                        "scene_no": scene_no,
-                        "audio": filename,
-                        "audio_url": f"/api/runs/{run_state.run_id}/audio/{filename}",
+                        "cover_audio": cover_audio,
+                        "cover_audio_url": f"/api/runs/{run_state.run_id}/audio/{cover_audio}",
                     },
                 )
-                print(f"[WORKER] TTS scene {scene_no} done in {time.time() - scene_tts_started_at:.1f}s")
+                print("[WORKER] TTS cover applied")
 
-            # TTS 모델 언로드 → ComfyUI VRAM 확보
-            print(f"[WORKER] all TTS done in {time.time() - tts_started_at:.1f}s")
-            unload_started_at = time.time()
-            await worker.unload_tts()
-            print(f"[WORKER] TTS model unloaded in {time.time() - unload_started_at:.1f}s")
+            # Scene audio
+            for scene in story.scenes:
+                scene_no = scene.scene_no
+                if scene_no in tts_results:
+                    filename = f"scene_{scene_no:02d}.wav"
+                    audio_path = run_dir / "audio" / filename
+                    audio_path.parent.mkdir(parents=True, exist_ok=True)
+                    audio_path.write_bytes(tts_results[scene_no])
+                    image_delay = _wav_image_delay(audio_path)
+                    run_state.set_scene_audio(scene_no, filename, image_delay)
+                    await _emit(
+                        run_state,
+                        {
+                            "scene_no": scene_no,
+                            "audio": filename,
+                            "audio_url": f"/api/runs/{run_state.run_id}/audio/{filename}",
+                        },
+                    )
+                    print(f"[WORKER] TTS scene {scene_no} applied")
 
-            # 씬별 이미지
+            # ── 이미지 생성 (TTS VRAM은 이미 해제된 상태) ──
             for scene_no, img_idxs in _WORKER_IMAGES.items():
                 scene = story.scenes[scene_no - 1]
                 for idx in img_idxs:

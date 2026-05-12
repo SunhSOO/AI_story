@@ -156,31 +156,53 @@ def unload_model() -> None:
 
     def _do_unload_in_tts_thread() -> None:
         """TTS 스레드(= CUDA 컨텍스트 소유 스레드)에서 실행."""
+        _log_cuda_memory("unload-before")
+
         try:
             ml = sys.modules.get('model_loader')
             if ml is not None and getattr(ml, '_model', None) is not None:
                 model = ml._model
+
+                # 1) 모델을 CPU로 이동 (VRAM에서 제거)
                 try:
                     if hasattr(model, "to"):
                         model.to("cpu")
                 except Exception as e:
                     print(f"[TTS] model.to('cpu') skipped: {e}")
+
+                # 2) 모델 내부 서브모듈/텐서 명시적 삭제
+                try:
+                    for attr_name in list(vars(model).keys()):
+                        try:
+                            delattr(model, attr_name)
+                        except Exception:
+                            pass
+                except Exception as e:
+                    print(f"[TTS] submodule cleanup: {e}")
+
                 ml._model = None
                 del model
                 print("[TTS] voxcpm2 model unloaded from VRAM")
         except Exception as e:
             print(f"[TTS] model unload: {e}")
 
+        # 3) 철저한 CUDA 메모리 해제
         gc.collect()
         try:
             import torch
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
                 torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
                 torch.cuda.reset_peak_memory_stats()
                 print("[TTS] CUDA cache cleared")
         except Exception as e:
             print(f"[TTS] CUDA cleanup: {e}")
+
+        # 4) 2차 gc (순환 참조 잔여분 정리)
+        gc.collect()
+
+        _log_cuda_memory("unload-after")
 
     with _tts_executor_lock:
         if _tts_executor is not None:

@@ -1,6 +1,8 @@
 """Worker server (5080): exposes LLM generation, ComfyUI image generation, and TTS via HTTP API."""
 import asyncio
+import base64
 import gc
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -30,6 +32,10 @@ class TTSRequest(BaseModel):
     dialogue_emotion: str
 
 
+class TTSBatchRequest(BaseModel):
+    items: list[TTSRequest]
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -55,7 +61,8 @@ async def image_generate(req: ImageRequest):
     return Response(content=img_bytes, media_type="image/png")
 
 
-_TTS_SCENE_TIMEOUT = 660
+_TTS_SCENE_TIMEOUT = 180
+_TTS_BATCH_TIMEOUT_PER_ITEM = 180
 
 
 async def _maybe_unload_tts_after_request(scene_no: int) -> None:
@@ -120,6 +127,65 @@ async def tts_generate(req: TTSRequest):
             ) from exc
 
 
+@app.post("/tts/batch")
+async def tts_batch_generate(req: TTSBatchRequest):
+    """여러 TTS를 한 번에 생성하고, 완료 후 자동으로 모델을 언로드하여 VRAM 해제."""
+    loop = asyncio.get_event_loop()
+    from app.clients.voxcpm2_client import get_tts_executor, reset_tts_executor
+
+    total_timeout = _TTS_BATCH_TIMEOUT_PER_ITEM * len(req.items)
+    batch_start = time.time()
+    print(f"[WORKER TTS BATCH] start items={len(req.items)} timeout={total_timeout}s")
+
+    try:
+        results = await asyncio.wait_for(
+            loop.run_in_executor(
+                get_tts_executor(),
+                _generate_tts_bytes_batch,
+                req.items,
+            ),
+            timeout=total_timeout,
+        )
+    except asyncio.TimeoutError:
+        reset_tts_executor()
+        # 타임아웃 시에도 VRAM 해제 시도
+        try:
+            await loop.run_in_executor(None, _unload_tts)
+        except Exception as e:
+            print(f"[WORKER TTS BATCH] unload after timeout failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"TTS batch timed out after {total_timeout}s",
+        )
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        # 에러 시에도 VRAM 해제 시도
+        try:
+            await loop.run_in_executor(None, _unload_tts)
+        except Exception as e:
+            print(f"[WORKER TTS BATCH] unload after failure failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"TTS batch failed: {type(exc).__name__}: {exc}",
+        ) from exc
+
+    # 성공 시 TTS 모델 언로드 → VRAM 해제
+    unload_start = time.time()
+    await loop.run_in_executor(None, _unload_tts)
+    print(
+        f"[WORKER TTS BATCH] done items={len(req.items)} "
+        f"total={time.time() - batch_start:.1f}s "
+        f"unload={time.time() - unload_start:.1f}s"
+    )
+
+    # base64 인코딩으로 반환
+    encoded = {}
+    for scene_no, wav_bytes in results.items():
+        encoded[str(scene_no)] = base64.b64encode(wav_bytes).decode("ascii")
+    return encoded
+
+
 @app.post("/tts/unload")
 async def tts_unload():
     loop = asyncio.get_event_loop()
@@ -182,6 +248,48 @@ def _generate_tts_bytes(req: TTSRequest) -> bytes:
         wav_bytes = output_path.read_bytes()
         print(f"[WORKER TTS] done scene={req.scene_no} bytes={len(wav_bytes)}")
         return wav_bytes
+
+
+def _generate_tts_bytes_batch(items: list) -> dict:
+    """TTS 전용 스레드에서 여러 scene의 TTS를 순차 생성. 모델 로드는 1회만 발생."""
+    import tempfile
+    from pathlib import Path
+    from app.clients.voxcpm2_client import synthesize, synthesize_narration_dialogue
+
+    results: dict[int, bytes] = {}
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        audio_dir = Path(tmpdir) / "audio"
+        audio_dir.mkdir()
+
+        for req in items:
+            scene_start = time.time()
+            output_path = audio_dir / f"scene_{req.scene_no:02d}.wav"
+
+            print(
+                f"[WORKER TTS BATCH] generating scene={req.scene_no} "
+                f"narration_len={len(req.narration)} dialogue_len={len(req.dialogue)}"
+            )
+
+            if req.dialogue:
+                synthesize_narration_dialogue(
+                    narration=req.narration,
+                    dialogue=req.dialogue,
+                    narration_emotion=None,
+                    dialogue_emotion=None,
+                    output_path=output_path,
+                )
+            else:
+                synthesize(text=req.narration, emotion=None, output_path=output_path)
+
+            wav_bytes = output_path.read_bytes()
+            results[req.scene_no] = wav_bytes
+            print(
+                f"[WORKER TTS BATCH] scene={req.scene_no} done "
+                f"bytes={len(wav_bytes)} elapsed={time.time() - scene_start:.1f}s"
+            )
+
+    return results
 
 
 def _free_comfyui() -> None:

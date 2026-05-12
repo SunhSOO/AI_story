@@ -1,4 +1,5 @@
 """Async HTTP client for the 5080 worker server."""
+import base64
 import aiohttp
 
 from app.schemas.story_schema import StorySchema
@@ -6,6 +7,7 @@ from app.schemas.story_schema import StorySchema
 _LLM_TIMEOUT = aiohttp.ClientTimeout(total=900)
 _IMG_TIMEOUT = aiohttp.ClientTimeout(total=300)
 _TTS_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=720)
+_TTS_BATCH_TIMEOUT_PER_ITEM = 180
 _CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=300)
 
 
@@ -77,6 +79,49 @@ class WorkerClient:
         except Exception as exc:
             raise RuntimeError(
                 f"Worker TTS request failed scene={scene_no}: {type(exc).__name__}: {exc!r}"
+            ) from exc
+
+    async def generate_tts_batch(
+        self,
+        items: list[dict],
+    ) -> dict[int, bytes]:
+        """배치 TTS 요청: 여러 scene의 TTS를 1회 요청으로 생성하고 자동 VRAM 해제.
+
+        Args:
+            items: list of {"scene_no", "narration", "dialogue", "narration_emotion", "dialogue_emotion"}
+
+        Returns:
+            {scene_no: wav_bytes} dict
+        """
+        total_timeout = aiohttp.ClientTimeout(
+            total=_TTS_BATCH_TIMEOUT_PER_ITEM * len(items) + 120,  # +120s for unload
+            sock_connect=30,
+        )
+        try:
+            print(f"[MASTER TTS BATCH] request items={len(items)}")
+            async with aiohttp.ClientSession(timeout=total_timeout) as session:
+                async with session.post(
+                    f"{self.base_url}/tts/batch",
+                    json={"items": items},
+                ) as resp:
+                    if resp.status >= 400:
+                        body = await resp.text()
+                        raise RuntimeError(
+                            f"Worker TTS batch HTTP {resp.status}: {body[:500]}"
+                        )
+                    data = await resp.json()
+                    # base64 디코딩
+                    result: dict[int, bytes] = {}
+                    for scene_no_str, b64_wav in data.items():
+                        result[int(scene_no_str)] = base64.b64decode(b64_wav)
+                    print(
+                        f"[MASTER TTS BATCH] response scenes={list(result.keys())} "
+                        f"total_bytes={sum(len(v) for v in result.values())}"
+                    )
+                    return result
+        except Exception as exc:
+            raise RuntimeError(
+                f"Worker TTS batch request failed: {type(exc).__name__}: {exc!r}"
             ) from exc
 
     async def generate_cover_tts(self, title: str) -> bytes:
