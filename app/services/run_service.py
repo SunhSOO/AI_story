@@ -17,6 +17,7 @@ class RunState:
         self.story_title: str = ""
         self.cover_image_url: str = ""
         self.cover_audio_url: str = ""
+        self.cover_audio_delay: int = 0
         self.scenes: list[SceneInfo] = []
         self.error: Optional[str] = None
         self.created_at = datetime.now()
@@ -35,7 +36,7 @@ class RunState:
             status=status,
             scenarios=[
                 ScenarioItem(index=0, image_url=self.cover_image_url, delay=0),
-                ScenarioItem(index=1, msg=self.story_title, audio_url=self.cover_audio_url, delay=0),
+                ScenarioItem(index=1, msg=self.story_title, audio_url=self.cover_audio_url, delay=self.cover_audio_delay),
             ],
         )
 
@@ -56,8 +57,9 @@ class RunState:
     def set_cover_image(self, filename: str) -> None:
         self.cover_image_url = f"/api/runs/{self.run_id}/images/{filename}"
 
-    def set_cover_audio(self, filename: str) -> None:
+    def set_cover_audio(self, filename: str, audio_delay: int = 0) -> None:
         self.cover_audio_url = f"/api/runs/{self.run_id}/audio/{filename}"
+        self.cover_audio_delay = audio_delay
 
     def init_scenes(self, scene_count: int) -> None:
         self.scenes = [SceneInfo(scene_no=i) for i in range(1, scene_count + 1)]
@@ -78,17 +80,19 @@ class RunState:
                     s.image_urls.append(url)
                 return
 
-    def set_scene_audio(self, scene_no: int, filename: str, image_delay: int = 1) -> None:
+    def set_scene_audio(self, scene_no: int, filename: str, image_delay: int = 1, audio_delay: int = 0) -> None:
         for s in self.scenes:
             if s.scene_no == scene_no:
                 s.audio_url = f"/api/runs/{self.run_id}/audio/{filename}"
                 s.image_delay = image_delay
+                s.audio_delay = audio_delay
                 return
 
-    def set_scene_dialogue_audio(self, scene_no: int, filename: str) -> None:
+    def set_scene_dialogue_audio(self, scene_no: int, filename: str, audio_delay: int = 0) -> None:
         for s in self.scenes:
             if s.scene_no == scene_no:
                 s.dialogue_audio_url = f"/api/runs/{self.run_id}/audio/{filename}"
+                s.dialogue_audio_delay = audio_delay
                 return
 
 

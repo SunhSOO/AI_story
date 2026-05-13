@@ -188,7 +188,8 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 scene_no=0, narration=story.title, dialogue="", output_filename=cover_audio,
             )
             if cover_path is not None:
-                run_state.set_cover_audio(cover_audio)
+                cover_delay = max(0, round(_wav_duration(cover_path)))
+                run_state.set_cover_audio(cover_audio, audio_delay=cover_delay)
                 await _emit(
                     run_state,
                     {
@@ -212,7 +213,8 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 )
                 if narr_path is not None:
                     image_delay = _wav_image_delay(narr_path)
-                    run_state.set_scene_audio(scene_no, narr_filename, image_delay)
+                    narr_delay = max(0, round(_wav_duration(narr_path)))
+                    run_state.set_scene_audio(scene_no, narr_filename, image_delay, audio_delay=narr_delay)
                     await _emit(
                         run_state,
                         {
@@ -233,7 +235,8 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                         output_filename=dial_filename,
                     )
                     if dial_path is not None:
-                        run_state.set_scene_dialogue_audio(scene_no, dial_filename)
+                        dial_delay = max(0, round(_wav_duration(dial_path)))
+                        run_state.set_scene_dialogue_audio(scene_no, dial_filename, audio_delay=dial_delay)
                         await _emit(
                             run_state,
                             {
