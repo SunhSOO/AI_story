@@ -43,8 +43,8 @@ Create one Korean children's story with exactly 4 scenes from the user inputs.
 - Use English only.
 - Keep the same main character design across all scenes.
 - Each scene must have exactly 2 different prompts.
-- First prompt: close-up or key moment.
-- Second prompt: wide shot with full setting.
+- First prompt: wide shot with full setting.
+- Second prompt: close-up or key moment.
 - Do not include numbers in image prompt text.
 
 ### Required JSON Shape And Field Order
