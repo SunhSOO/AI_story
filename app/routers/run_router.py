@@ -14,6 +14,8 @@ from app.services import storage_service
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
+MEDIA_CACHE_HEADERS = {"Cache-Control": "public, max-age=86400, immutable"}
+
 
 @router.post("", response_model=CreateRunResponse, status_code=201)
 async def create_run(request: CreateRunRequest, background_tasks: BackgroundTasks):
@@ -85,7 +87,7 @@ async def get_image(run_id: str, filename: str):
     return FileResponse(
         path,
         media_type="image/png",
-        headers={"Cache-Control": "no-store"},
+        headers=MEDIA_CACHE_HEADERS,
     )
 
 
@@ -98,7 +100,7 @@ async def get_audio(run_id: str, filename: str):
     return FileResponse(
         path,
         media_type="audio/wav",
-        headers={"Cache-Control": "no-store"},
+        headers=MEDIA_CACHE_HEADERS,
     )
 
 
