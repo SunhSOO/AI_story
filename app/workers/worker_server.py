@@ -24,6 +24,10 @@ class ImageRequest(BaseModel):
     stem: str
 
 
+class ImageBatchRequest(BaseModel):
+    images: list[ImageRequest]
+
+
 class TTSRequest(BaseModel):
     scene_no: int
     narration: str
@@ -67,6 +71,33 @@ async def image_generate(req: ImageRequest):
     loop = asyncio.get_event_loop()
     img_bytes = await loop.run_in_executor(None, _generate_image_bytes, req.prompt, req.seed, req.stem)
     return Response(content=img_bytes, media_type="image/png")
+
+
+@app.post("/image/batch")
+async def image_batch_generate(req: ImageBatchRequest):
+    if not req.images:
+        raise HTTPException(status_code=400, detail="images must not be empty")
+
+    loop = asyncio.get_event_loop()
+    try:
+        results = await loop.run_in_executor(None, _generate_image_batch_bytes, req.images)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Image batch failed: {type(exc).__name__}: {exc}",
+        ) from exc
+
+    return {
+        "images": [
+            {
+                "stem": stem,
+                "image_base64": base64.b64encode(img_bytes).decode("ascii"),
+            }
+            for stem, img_bytes in results
+        ]
+    }
 
 
 @app.post("/stt/transcribe")
@@ -288,6 +319,42 @@ def _generate_image_bytes(prompt: str, seed: int, stem: str) -> bytes:
         workflow_path=settings.workflow_path,
         client=client,
     )
+
+
+def _generate_image_batch_bytes(items: list[ImageRequest]) -> list[tuple[str, bytes]]:
+    from app.clients.comfyui_client import ComfyUIClient, generate_image_bytes
+    from app.core.config import settings
+
+    client = ComfyUIClient()
+    results: list[tuple[str, bytes]] = []
+    batch_start = time.time()
+    print(f"[WORKER IMAGE BATCH] start count={len(items)}")
+
+    for pos, item in enumerate(items, start=1):
+        item_start = time.time()
+        print(
+            f"[WORKER IMAGE BATCH] generating {pos}/{len(items)} "
+            f"stem={item.stem} prompt_len={len(item.prompt)}"
+        )
+        img_bytes = generate_image_bytes(
+            prompt=item.prompt,
+            seed=item.seed,
+            stem=item.stem,
+            workflow_path=settings.workflow_path,
+            client=client,
+        )
+        results.append((item.stem, img_bytes))
+        print(
+            f"[WORKER IMAGE BATCH] done {pos}/{len(items)} "
+            f"stem={item.stem} bytes={len(img_bytes)} "
+            f"elapsed={time.time() - item_start:.1f}s"
+        )
+
+    print(
+        f"[WORKER IMAGE BATCH] complete count={len(results)} "
+        f"elapsed={time.time() - batch_start:.1f}s"
+    )
+    return results
 
 
 def _transcribe_stt_bytes(audio_bytes: bytes, language: str) -> tuple[str, float]:

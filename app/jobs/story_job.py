@@ -263,35 +263,56 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
         # Branch B (5080 Worker): cover image plus all scene images
         async def _worker_image_branch():
-            print("[WORKER] Generating all images on 5080...")
+            print("[WORKER] Generating all images on 5080 via sequential batch...")
+            try:
+                cover_filename = "cover.png"
+                image_items = [
+                    {
+                        "prompt": story.cover_prompt,
+                        "seed": base_seed,
+                        "stem": "cover",
+                    }
+                ]
+                scene_outputs: list[tuple[int, int, str, str]] = []
 
-            cover_filename = "cover.png"
-            print("[WORKER] Generating cover image on 5080...")
-            cover_bytes = await worker.generate_image(story.cover_prompt, base_seed, "cover")
-            cover_path = run_dir / "images" / cover_filename
-            cover_path.parent.mkdir(parents=True, exist_ok=True)
-            cover_path.write_bytes(cover_bytes)
-            run_state.set_cover_image(cover_filename)
-            await _emit(
-                run_state,
-                {
-                    "cover_image": cover_filename,
-                    "cover_image_url": f"/api/runs/{run_state.run_id}/images/{cover_filename}",
-                },
-            )
-            print("[WORKER] cover done")
+                for scene_no, img_idxs in _WORKER_IMAGES.items():
+                    scene = story.scenes[scene_no - 1]
+                    for idx in img_idxs:
+                        stem = f"scene_{scene_no:02d}_img_{idx:02d}"
+                        filename = f"{stem}.png"
+                        image_items.append(
+                            {
+                                "prompt": scene.image_prompts[idx - 1],
+                                "seed": base_seed,
+                                "stem": stem,
+                            }
+                        )
+                        scene_outputs.append((scene_no, idx, stem, filename))
 
-            for scene_no, img_idxs in _WORKER_IMAGES.items():
-                scene = story.scenes[scene_no - 1]
-                for idx in img_idxs:
-                    stem = f"scene_{scene_no:02d}_img_{idx:02d}"
-                    filename = f"{stem}.png"
-                    seed = base_seed
-                    prompt = scene.image_prompts[idx - 1]
-                    print(f"[WORKER] Generating scene {scene_no} img {idx} on 5080...")
-                    img_bytes = await worker.generate_image(prompt, seed, stem)
+                t0 = time.time()
+                print(f"[WORKER] Sending image batch to 5080 count={len(image_items)}")
+                image_bytes_by_stem = await worker.generate_image_batch(image_items)
+                print(f"[WORKER] Image batch received in {time.time() - t0:.1f}s")
+                cover_path = run_dir / "images" / cover_filename
+                cover_path.parent.mkdir(parents=True, exist_ok=True)
+                cover_path.write_bytes(image_bytes_by_stem["cover"])
+                run_state.set_cover_image(cover_filename)
+                await _emit(
+                    run_state,
+                    {
+                        "cover_image": cover_filename,
+                        "cover_image_url": f"/api/runs/{run_state.run_id}/images/{cover_filename}",
+                    },
+                )
+                print("[WORKER] cover done")
+
+                emitted_scene_no = None
+                for scene_no, idx, stem, filename in scene_outputs:
+                    if emitted_scene_no is not None and emitted_scene_no != scene_no:
+                        await _emit(run_state, {"scene_no": emitted_scene_no})
+
                     img_path = run_dir / "images" / filename
-                    img_path.write_bytes(img_bytes)
+                    img_path.write_bytes(image_bytes_by_stem[stem])
                     run_state.add_scene_image(scene_no, filename)
                     await _emit(
                         run_state,
@@ -301,12 +322,15 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                             "image_url": f"/api/runs/{run_state.run_id}/images/{filename}",
                         },
                     )
-                    print(f"[WORKER] scene {scene_no} img {idx} done")
-                await _emit(run_state, {"scene_no": scene_no})
+                    print(f"[WORKER] scene {scene_no} img {idx} saved from batch")
+                    emitted_scene_no = scene_no
 
-            # 워커 이미지가 모두 끝난 뒤에는 ComfyUI 모델까지 내려 VRAM을 반환한다.
-            await worker.free_comfyui(unload_models=True)
-            print("[WORKER] ComfyUI VRAM freed after final image")
+                if emitted_scene_no is not None:
+                    await _emit(run_state, {"scene_no": emitted_scene_no})
+            finally:
+                # 워커 이미지가 끝나거나 실패하면 ComfyUI 모델까지 내려 VRAM을 반환한다.
+                await worker.free_comfyui(unload_models=True)
+                print("[WORKER] ComfyUI VRAM freed after image branch")
 
         branch_results = await asyncio.gather(
             _master_tts_branch(), _worker_image_branch(), return_exceptions=True
