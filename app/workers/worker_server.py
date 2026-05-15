@@ -134,6 +134,8 @@ async def tts_generate(req: TTSRequest):
             return Response(content=wav_bytes, media_type="audio/wav")
         except AssertionError as exc:
             # torch.compile / CUDA graph TLS 충돌 — executor 리셋 후 1회 재시도
+            import traceback
+            traceback.print_exc()
             print(
                 f"[WORKER TTS] AssertionError scene={req.scene_no} attempt={attempt}: {exc!r}"
                 + (" → resetting executor and retrying" if attempt == 0 else " → giving up")

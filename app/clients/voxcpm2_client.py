@@ -80,6 +80,30 @@ _tts_executor: concurrent.futures.ThreadPoolExecutor | None = None
 _tts_executor_lock = threading.Lock()
 _tts_warmed_up = False
 _tts_warmup_lock = threading.Lock()
+_torch_tts_configured = False
+_torch_tts_config_lock = threading.Lock()
+
+
+def _configure_torch_for_tts() -> None:
+    """Avoid VoxCPM2 torch.compile CUDA graph failures on varied text lengths."""
+    global _torch_tts_configured
+    if _torch_tts_configured:
+        return
+
+    with _torch_tts_config_lock:
+        if _torch_tts_configured:
+            return
+        try:
+            import torch._inductor.config as inductor_config
+
+            # VoxCPM2 sees many input lengths in this app. Dynamic CUDAGraph capture
+            # can assert after generation on Windows/CUDA, so skip those graphs.
+            inductor_config.triton.cudagraph_skip_dynamic_graphs = True
+            inductor_config.triton.cudagraph_dynamic_shape_warn_limit = None
+            print("[TTS] torch inductor dynamic CUDAGraphs disabled")
+        except Exception as e:
+            print(f"[TTS] torch inductor config skipped: {e}")
+        _torch_tts_configured = True
 
 
 def _format_bytes(value: int) -> str:
@@ -224,6 +248,8 @@ def _patch_tqdm() -> None:
 
 def _get_model():
     """Load the voxcpm2 model, adding its directory to sys.path as needed."""
+    _configure_torch_for_tts()
+
     vox_dir = settings.voxcpm2_dir
     if not vox_dir.exists():
         raise TTSError(f"voxcpm2TTS directory not found: {vox_dir}")

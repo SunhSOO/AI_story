@@ -174,9 +174,9 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                 except Exception as exc:
                     print(
                         f"[MASTER TTS] {output_filename} failed after "
-                        f"{time.time() - t0:.1f}s (non-fatal): {exc!r}"
+                        f"{time.time() - t0:.1f}s: {exc!r}"
                     )
-                    return None
+                    raise
                 output_path = run_dir / "audio" / output_filename
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 output_path.write_bytes(wav_bytes)
