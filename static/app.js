@@ -411,9 +411,7 @@ function setText(id, text, placeholder = false) {
 }
 
 function withCache(path) {
-  const absolute = path.startsWith('http') ? path : `${API}${path}`;
-  const separator = absolute.includes('?') ? '&' : '?';
-  return `${absolute}${separator}t=${Date.now()}`;
+  return path.startsWith('http') ? path : `${API}${path}`;
 }
 
 async function toggleRecording(button) {
