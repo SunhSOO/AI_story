@@ -2,9 +2,10 @@
 import asyncio
 import base64
 import gc
+import json
 import time
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="Story Worker", version="1.0.0")
@@ -98,6 +99,61 @@ async def image_batch_generate(req: ImageBatchRequest):
             for stem, img_bytes in results
         ]
     }
+
+
+@app.post("/image/batch-stream")
+async def image_batch_stream_generate(req: ImageBatchRequest):
+    if not req.images:
+        raise HTTPException(status_code=400, detail="images must not be empty")
+
+    async def _stream():
+        loop = asyncio.get_event_loop()
+        from app.clients.comfyui_client import ComfyUIClient
+
+        client = ComfyUIClient()
+        batch_start = time.time()
+        print(f"[WORKER IMAGE STREAM] start count={len(req.images)}")
+
+        for pos, item in enumerate(req.images, start=1):
+            item_start = time.time()
+            try:
+                print(
+                    f"[WORKER IMAGE STREAM] generating {pos}/{len(req.images)} "
+                    f"stem={item.stem} prompt_len={len(item.prompt)}"
+                )
+                img_bytes = await loop.run_in_executor(
+                    None,
+                    _generate_image_bytes_with_client,
+                    item.prompt,
+                    item.seed,
+                    item.stem,
+                    client,
+                )
+                print(
+                    f"[WORKER IMAGE STREAM] done {pos}/{len(req.images)} "
+                    f"stem={item.stem} bytes={len(img_bytes)} "
+                    f"elapsed={time.time() - item_start:.1f}s"
+                )
+                yield json.dumps({"stem": item.stem, "bytes": len(img_bytes)}).encode("utf-8") + b"\n"
+                yield img_bytes
+                yield b"\n"
+            except Exception as exc:
+                import traceback
+                traceback.print_exc()
+                yield (
+                    json.dumps(
+                        {"error": f"{type(exc).__name__}: {exc}", "stem": item.stem}
+                    ).encode("utf-8")
+                    + b"\n"
+                )
+                return
+
+        print(
+            f"[WORKER IMAGE STREAM] complete count={len(req.images)} "
+            f"elapsed={time.time() - batch_start:.1f}s"
+        )
+
+    return StreamingResponse(_stream(), media_type="application/octet-stream")
 
 
 @app.post("/stt/transcribe")
@@ -312,6 +368,13 @@ def _generate_image_bytes(prompt: str, seed: int, stem: str) -> bytes:
     from app.clients.comfyui_client import ComfyUIClient, generate_image_bytes
     from app.core.config import settings
     client = ComfyUIClient()
+    return _generate_image_bytes_with_client(prompt, seed, stem, client)
+
+
+def _generate_image_bytes_with_client(prompt: str, seed: int, stem: str, client) -> bytes:
+    from app.clients.comfyui_client import generate_image_bytes
+    from app.core.config import settings
+
     return generate_image_bytes(
         prompt=prompt,
         seed=seed,
