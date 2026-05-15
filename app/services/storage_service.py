@@ -118,7 +118,10 @@ def _load_scene_infos(run_id: str, run_dir: Path, story_data: dict) -> list[Scen
                 dialogue_emotion=str(raw.get("dialogue_emotion") or ""),
                 image_urls=_scene_image_urls(run_id, run_dir, scene_no),
                 audio_url=_scene_audio_url(run_id, run_dir, scene_no),
+                dialogue_audio_url=_scene_dialogue_audio_url(run_id, run_dir, scene_no),
                 image_delay=_scene_image_delay(run_dir, scene_no),
+                audio_delay=_scene_audio_delay(run_dir, scene_no, 0),
+                dialogue_audio_delay=_scene_audio_delay(run_dir, scene_no, 1),
             )
         )
     return scenes
@@ -135,13 +138,18 @@ def _scene_image_urls(run_id: str, run_dir: Path, scene_no: int) -> list[str]:
 
 
 def _scene_audio_url(run_id: str, run_dir: Path, scene_no: int) -> str:
-    filename = f"scene_{scene_no:02d}.wav"
+    filename = f"scene_{scene_no:02d}_0.wav"
+    return _asset_url(run_id, "audio", filename) if (run_dir / "audio" / filename).exists() else ""
+
+
+def _scene_dialogue_audio_url(run_id: str, run_dir: Path, scene_no: int) -> str:
+    filename = f"scene_{scene_no:02d}_1.wav"
     return _asset_url(run_id, "audio", filename) if (run_dir / "audio" / filename).exists() else ""
 
 
 def _scene_image_delay(run_dir: Path, scene_no: int) -> int:
     """WAV duration divided by the scene image count. Returns 1 on read failure."""
-    path = run_dir / "audio" / f"scene_{scene_no:02d}.wav"
+    path = run_dir / "audio" / f"scene_{scene_no:02d}_0.wav"
     if not path.exists():
         return 1
     try:
@@ -150,6 +158,17 @@ def _scene_image_delay(run_dir: Path, scene_no: int) -> int:
         return max(1, round(duration / settings.images_per_scene))
     except Exception:
         return 1
+
+
+def _scene_audio_delay(run_dir: Path, scene_no: int, audio_index: int) -> int:
+    path = run_dir / "audio" / f"scene_{scene_no:02d}_{audio_index}.wav"
+    if not path.exists():
+        return 0
+    try:
+        with wave.open(str(path), "rb") as f:
+            return max(0, round(f.getnframes() / f.getframerate()))
+    except Exception:
+        return 0
 
 
 def _image_index(filename: str) -> int:
