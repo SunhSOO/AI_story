@@ -96,3 +96,4 @@ class RunStateResponse(BaseModel):
     cover: Optional[SceneScenarioInfo] = None
     scenes: list[SceneScenarioInfo] = Field(default_factory=list)
     error: Optional[str] = None
+    restart_required: bool = False

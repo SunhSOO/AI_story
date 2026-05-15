@@ -74,7 +74,7 @@ class Settings(BaseSettings):
 
     # Story pipeline
     scene_count: int = 4
-    llm_max_retries: int = 3
+    llm_max_retries: int = 1
 
 
 settings = Settings()

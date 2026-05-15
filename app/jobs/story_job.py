@@ -374,7 +374,22 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
         error = f"{type(exc).__name__}: {exc!r}"
         run_state.status = RunStatus.FAILED
         run_state.error = error
-        await _emit(run_state, {"error": error})
+        run_state.restart_required = True
+        await _cleanup_system(
+            "failure cleanup before fresh input",
+            worker=worker,
+            unload_local_comfyui=True,
+            unload_worker_comfyui=True,
+        )
+        cleanup_done = True
+        await _emit(
+            run_state,
+            {
+                "error": error,
+                "restart_required": True,
+                "cleanup_done": True,
+            },
+        )
 
     finally:
         if not cleanup_done:

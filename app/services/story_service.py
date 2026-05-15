@@ -3,8 +3,9 @@ import json
 import random
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from app.clients.llama_cpp_client import call_llama
-from app.core.config import settings
 from app.core.exceptions import LLMError, SchemaValidationError
 from app.schemas.story_schema import StorySchema
 
@@ -97,41 +98,30 @@ def generate_story(
     topic: str,
     seed: int | None = None,
 ) -> StorySchema:
-    """Run LLM and return a validated StorySchema.
+    """Run LLM once and return a validated StorySchema.
 
-    Retries up to settings.llm_max_retries times.
+    A failed LLM output is surfaced immediately so the pipeline can clean up
+    VRAM and require a fresh request instead of retrying with the same inputs.
 
     Raises:
-        LLMError: If all retries fail.
-        SchemaValidationError: If validation repeatedly fails.
+        LLMError: If generation or JSON parsing fails.
+        SchemaValidationError: If schema validation fails.
     """
     prompt = _build_prompt(era, place, characters, topic, seed)
-    current_prompt = prompt
-    last_error: Exception | None = None
+    print("\n=== LLM attempt 1/1 ===")
 
-    for attempt in range(settings.llm_max_retries):
-        print(f"\n=== LLM attempt {attempt + 1}/{settings.llm_max_retries} ===")
-        try:
-            json_str = call_llama(current_prompt, seed=seed)
-            story_dict = json.loads(json_str)
-            story = StorySchema.model_validate(story_dict)
-            _ensure_not_boilerplate(story)
-            return story
-        except json.JSONDecodeError as e:
-            last_error = LLMError(f"JSON parse error: {e}")
-        except Exception as e:
-            if "SchemaValidation" in type(e).__name__ or "ValidationError" in type(e).__name__:
-                last_error = SchemaValidationError(str(e))
-            else:
-                last_error = LLMError(str(e))
+    json_str = call_llama(prompt, seed=seed)
+    try:
+        story_dict = json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise LLMError(f"JSON parse error: {e}") from e
 
-        print(f"[RETRY] Attempt {attempt + 1} failed: {last_error}")
-        retry_hint = (
-            "REMINDER: Output ONLY the JSON object. "
-            "Use a fresh plot and concrete scene-specific dialogue. "
-            "Do not use boilerplate phrases about meeting new friends, getting lost, not giving up, or doing anything together. "
-            "scenes array must have exactly 4 items. dialogue_emotion must be one of: 기쁨, 슬픔, 무서움.\n"
-        )
-        current_prompt = retry_hint + prompt
+    try:
+        story = StorySchema.model_validate(story_dict)
+        _ensure_not_boilerplate(story)
+    except SchemaValidationError:
+        raise
+    except ValidationError as e:
+        raise SchemaValidationError(str(e)) from e
 
-    raise LLMError(f"Story generation failed after {settings.llm_max_retries} retries: {last_error}")
+    return story

@@ -26,6 +26,7 @@ const state = {
   audioChunks: [],
   activeStream: null,
   activeVoiceButton: null,
+  restartHandled: false,
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -96,6 +97,7 @@ async function startGeneration(event) {
   if (!payload) return;
 
   closeMonitoring();
+  state.restartHandled = false;
   resetRunUI();
   setFormBusy(true);
   showMessage('');
@@ -150,6 +152,10 @@ function startMonitoring() {
     state.eventSource.addEventListener('update', (event) => {
       const message = parseJSON(event.data);
       if (message) addEventLog(eventLabel(message));
+      if (message?.restart_required) {
+        handleRestartRequired(message.error);
+        return;
+      }
       applyEventHint(message);
       refreshRun();
 
@@ -191,6 +197,10 @@ async function refreshRun() {
 
     const data = await response.json();
     state.pollFailures = 0;
+    if (data.restart_required) {
+      handleRestartRequired(data.error);
+      return;
+    }
     renderRun(data);
 
     if (data.status === 'DONE' || data.status === 'FAILED') {
@@ -527,6 +537,7 @@ function addEventLog(label) {
 }
 
 function eventLabel(message) {
+  if (message.restart_required) return '새 입력 필요';
   if (message.status === 'FAILED') return '작업 실패';
   if (message.status === 'DONE') return '작업 완료';
   if (message.cover_image_url) return '표지 이미지 도착';
@@ -581,6 +592,7 @@ function applyEventHint(message) {
 function resetAll() {
   closeMonitoring();
   state.runId = '';
+  state.restartHandled = false;
   FIELD_IDS.forEach((id) => {
     document.getElementById(id).value = '';
     setFieldStatus(id, '');
@@ -590,6 +602,23 @@ function resetAll() {
   setFormBusy(false);
   showMessage('');
   setConnection('대기');
+}
+
+function handleRestartRequired(error) {
+  if (state.restartHandled) return;
+  state.restartHandled = true;
+  closeMonitoring();
+  state.runId = '';
+  FIELD_IDS.forEach((id) => {
+    document.getElementById(id).value = '';
+    setFieldStatus(id, '');
+  });
+  resetRunUI();
+  document.getElementById('run-panel').hidden = true;
+  setFormBusy(false);
+  const detail = error ? ` (${String(error).slice(0, 180)})` : '';
+  showMessage(`LLM 생성에 실패해 VRAM을 정리했습니다. 처음부터 다시 입력해 주세요.${detail}`);
+  setConnection('새 입력 필요', 'error');
 }
 
 function resetRunUI() {

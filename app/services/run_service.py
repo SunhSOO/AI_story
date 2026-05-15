@@ -20,6 +20,7 @@ class RunState:
         self.cover_audio_delay: int = 0
         self.scenes: list[SceneInfo] = []
         self.error: Optional[str] = None
+        self.restart_required: bool = False
         self.created_at = datetime.now()
 
     def _build_cover(self) -> SceneScenarioInfo:
@@ -49,6 +50,7 @@ class RunState:
             cover=self._build_cover(),
             scenes=[s.to_scenario_info() for s in self.scenes],
             error=self.error,
+            restart_required=self.restart_required,
         )
 
     def set_story_title(self, title: str) -> None:

@@ -62,9 +62,12 @@ async def llm_generate(req: LLMRequest):
         story = await loop.run_in_executor(
             None, generate_story, req.era_ko, req.place_ko, req.characters_ko, req.topic_ko, req.seed
         )
-        return story.model_dump()
-    finally:
+    except Exception:
+        await loop.run_in_executor(None, _do_cleanup, True)
+        raise
+    else:
         await loop.run_in_executor(None, _cleanup_llm)
+        return story.model_dump()
 
 
 @app.post("/image/generate")
@@ -567,7 +570,10 @@ def _cleanup_llm() -> None:
 def _do_cleanup(unload_comfyui_models: bool = False) -> None:
     _cleanup_llm()
 
-    _unload_tts()
+    try:
+        _unload_tts()
+    except Exception as e:
+        print(f"[CLEANUP] TTS unload: {e}")
 
     try:
         from app.clients.comfyui_client import ComfyUIClient

@@ -77,6 +77,7 @@ def load_run_response(run_id: str) -> RunStateResponse | None:
         cover=_build_cover_scenario(cover_image_url, cover_audio_url, story_title),
         scenes=[s.to_scenario_info() for s in scene_infos],
         error=None if complete else "서버가 재시작되어 파일에서 가능한 결과만 복구했습니다.",
+        restart_required=not complete,
     )
 
 

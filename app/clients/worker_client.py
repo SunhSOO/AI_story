@@ -39,7 +39,9 @@ class WorkerClient:
                     "seed": seed,
                 },
             ) as resp:
-                resp.raise_for_status()
+                if resp.status >= 400:
+                    body = await resp.text()
+                    raise RuntimeError(f"Worker LLM HTTP {resp.status}: {body[:500]}")
                 data = await resp.json()
                 return StorySchema(**data)
 
