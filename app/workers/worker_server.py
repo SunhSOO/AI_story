@@ -3,7 +3,7 @@ import asyncio
 import base64
 import gc
 import time
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -59,6 +59,35 @@ async def image_generate(req: ImageRequest):
     loop = asyncio.get_event_loop()
     img_bytes = await loop.run_in_executor(None, _generate_image_bytes, req.prompt, req.seed, req.stem)
     return Response(content=img_bytes, media_type="image/png")
+
+
+@app.post("/stt/transcribe")
+async def stt_transcribe(
+    audio_file: UploadFile = File(...),
+    language: str = Form(default="ko-KR"),
+):
+    audio_bytes = await audio_file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio file")
+
+    print(f"[WORKER STT] /stt/transcribe received bytes={len(audio_bytes)} language={language}")
+    loop = asyncio.get_event_loop()
+    try:
+        stt_text, confidence = await loop.run_in_executor(
+            None,
+            _transcribe_stt_bytes,
+            audio_bytes,
+            language,
+        )
+        print(f"[WORKER STT] done chars={len(stt_text)} confidence={confidence:.2f}")
+        return {"stt_text": stt_text, "confidence": confidence}
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"STT failed: {type(exc).__name__}: {exc}",
+        ) from exc
 
 
 _TTS_SCENE_TIMEOUT = 600
@@ -247,6 +276,12 @@ def _generate_image_bytes(prompt: str, seed: int, stem: str) -> bytes:
         workflow_path=settings.workflow_path,
         client=client,
     )
+
+
+def _transcribe_stt_bytes(audio_bytes: bytes, language: str) -> tuple[str, float]:
+    from app.clients.whisper_client import transcribe
+
+    return transcribe(audio_bytes, language)
 
 
 def _generate_tts_bytes(req: TTSRequest) -> bytes:
