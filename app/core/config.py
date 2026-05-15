@@ -48,14 +48,14 @@ class Settings(BaseSettings):
     comfyui_output_dir: Path = BASE_DIR / "ComfyUI" / "output"
     workflow_path: Path = BASE_DIR / "make_panel.json"
     images_per_scene: int = 2
-    image_gen_timeout: int = 300
+    image_gen_timeout: int = 400
     comfyui_unload_models_after_run: bool = False
 
     # voxcpm2 TTS
     voxcpm2_dir: Path = BASE_DIR / "voxcpm2TTS"
     tts_reference_wav: Path = BASE_DIR / "voxcpm2TTS" / "reference_speaker.mp3"
     tts_cfg_value: float = 1.0
-    tts_timesteps: int = 14
+    tts_timesteps: int = 24
     tts_warmup_enabled: bool = False
     tts_cleanup_each_scene: bool = True
     tts_unload_after_each_request: bool = False
