@@ -63,12 +63,8 @@ class ComfyUIClient:
                 json={"unload_models": unload_models, "free_memory": True},
                 timeout=30,
             )
-            if r.status_code >= 400:
-                print(f"[COMFYUI] /free HTTP {r.status_code}: {r.text[:500]}")
-                return False
-            return True
-        except Exception as exc:
-            print(f"[COMFYUI] /free request failed: {type(exc).__name__}: {exc}")
+            return r.status_code == 200
+        except Exception:
             return False
 
 
