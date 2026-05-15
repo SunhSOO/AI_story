@@ -251,12 +251,16 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                         )
                         print(f"[WORKER] TTS scene {scene_no} dialogue applied → {dial_filename}")
 
-            # TTS 모두 끝났으니 모델 언로드해서 ComfyUI 위한 VRAM 확보
+            # 마지막 TTS(scene_04_1.wav 등)까지 끝난 뒤 모델을 내려 ComfyUI용 VRAM을 확보한다.
             try:
                 await worker.unload_tts()
                 print(f"[WORKER] TTS unload done (all per-scene in {time.time() - tts_started_at:.1f}s)")
             except Exception as unload_exc:
-                print(f"[WORKER] TTS unload failed (continuing to images): {unload_exc!r}")
+                print(f"[WORKER] TTS unload failed before images: {unload_exc!r}")
+                raise
+
+            print("[WORKER] Waiting 1.0s before ComfyUI image generation")
+            await asyncio.sleep(1.0)
 
             # ── 이미지 생성 (TTS VRAM은 이미 해제된 상태) ──
             for scene_no, img_idxs in _WORKER_IMAGES.items():
@@ -282,9 +286,9 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                     print(f"[WORKER] scene {scene_no} img {idx} done")
                 await _emit(run_state, {"scene_no": scene_no})
 
-            # 워커 ComfyUI VRAM 해제
-            await worker.free_comfyui()
-            print("[WORKER] ComfyUI VRAM freed")
+            # 워커 이미지가 모두 끝난 뒤에는 ComfyUI 모델까지 내려 VRAM을 반환한다.
+            await worker.free_comfyui(unload_models=True)
+            print("[WORKER] ComfyUI VRAM freed after final image")
 
         # Branch B (3080 Master): cover image plus local ComfyUI images
         async def _local_branch():
@@ -328,7 +332,7 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                     print(f"[LOCAL] scene {scene_no} img {idx} done")
                 await _emit(run_state, {"scene_no": scene_no})
 
-            await loop.run_in_executor(None, local_client.free_memory)
+            await loop.run_in_executor(None, local_client.free_memory, True)
 
             # CUDA 캐시까지 명시적으로 반환
             def _local_cuda_cleanup():
