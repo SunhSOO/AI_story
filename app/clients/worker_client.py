@@ -130,6 +130,9 @@ class WorkerClient:
                         if not raw_line:
                             break
                         data = json.loads(raw_line.decode("utf-8"))
+                        if data.get("ping"):
+                            print(f"[WORKER IMAGE STREAM HTTP] ping stem={data.get('stem')}")
+                            continue
                         if data.get("error"):
                             raise RuntimeError(
                                 f"Worker image stream failed stem={data.get('stem')}: {data['error']}"

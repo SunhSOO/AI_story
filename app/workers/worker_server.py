@@ -121,7 +121,7 @@ async def image_batch_stream_generate(req: ImageBatchRequest):
                     f"[WORKER IMAGE STREAM] generating {pos}/{len(req.images)} "
                     f"stem={item.stem} prompt_len={len(item.prompt)}"
                 )
-                img_bytes = await loop.run_in_executor(
+                future = loop.run_in_executor(
                     None,
                     _generate_image_bytes_with_client,
                     item.prompt,
@@ -129,6 +129,10 @@ async def image_batch_stream_generate(req: ImageBatchRequest):
                     item.stem,
                     client,
                 )
+                while not future.done():
+                    yield json.dumps({"ping": True, "stem": item.stem}).encode("utf-8") + b"\n"
+                    await asyncio.sleep(10)
+                img_bytes = await future
                 print(
                     f"[WORKER IMAGE STREAM] done {pos}/{len(req.images)} "
                     f"stem={item.stem} bytes={len(img_bytes)} "
