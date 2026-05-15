@@ -1,5 +1,6 @@
 """Async HTTP client for the 5080 worker server."""
 import base64
+import json
 import time
 import aiohttp
 
@@ -102,6 +103,59 @@ class WorkerClient:
         except Exception as exc:
             raise RuntimeError(
                 f"Worker image batch request failed: {type(exc).__name__}: {exc!r}"
+            ) from exc
+
+    async def stream_image_batch(self, items: list[dict]):
+        timeout = aiohttp.ClientTimeout(
+            total=_IMG_BATCH_TIMEOUT_PER_ITEM * max(1, len(items)),
+            sock_connect=30,
+            sock_read=_IMG_BATCH_TIMEOUT_PER_ITEM,
+        )
+        stems = [str(item.get("stem", "")) for item in items]
+        started_at = time.time()
+        try:
+            print(f"[WORKER IMAGE STREAM HTTP] request count={len(items)} stems={stems}")
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(
+                    f"{self.base_url}/image/batch-stream",
+                    json={"images": items},
+                ) as resp:
+                    if resp.status >= 400:
+                        body = await resp.text()
+                        raise RuntimeError(f"Worker image stream HTTP {resp.status}: {body[:500]}")
+
+                    received = 0
+                    while True:
+                        raw_line = await resp.content.readline()
+                        if not raw_line:
+                            break
+                        data = json.loads(raw_line.decode("utf-8"))
+                        if data.get("error"):
+                            raise RuntimeError(
+                                f"Worker image stream failed stem={data.get('stem')}: {data['error']}"
+                            )
+                        stem = str(data["stem"])
+                        img_bytes = await resp.content.readexactly(int(data["bytes"]))
+                        await resp.content.readexactly(1)
+                        received += 1
+                        print(
+                            f"[WORKER IMAGE STREAM HTTP] item stem={stem} "
+                            f"bytes={len(img_bytes)} received={received}/{len(items)} "
+                            f"elapsed={time.time() - started_at:.1f}s"
+                        )
+                        yield stem, img_bytes
+
+            print(
+                f"[WORKER IMAGE STREAM HTTP] complete count={received} "
+                f"elapsed={time.time() - started_at:.1f}s"
+            )
+            if received != len(items):
+                raise RuntimeError(
+                    f"Worker image stream ended early: received={received}, expected={len(items)}"
+                )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Worker image stream request failed: {type(exc).__name__}: {exc!r}"
             ) from exc
 
     async def generate_tts(

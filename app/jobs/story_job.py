@@ -194,69 +194,83 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
 
             try:
                 # ── Cover audio ──
-                cover_audio = "cover.wav"
-                cover_path = await _generate_tts_file(
-                    scene_no=0,
-                    text=story.title,
-                    output_filename=cover_audio,
-                )
-                if cover_path is not None:
-                    cover_delay = max(0, round(_wav_duration(cover_path)))
-                    run_state.set_cover_audio(cover_audio, audio_delay=cover_delay)
-                    await _emit(
-                        run_state,
-                        {
-                            "cover_audio": cover_audio,
-                            "cover_audio_url": f"/api/runs/{run_state.run_id}/audio/{cover_audio}",
-                        },
-                    )
-                    print("[MASTER] TTS cover applied")
+                tts_items = [
+                    {
+                        "kind": "cover",
+                        "scene_no": 0,
+                        "text": story.title,
+                        "filename": "cover.wav",
+                    }
+                ]
 
-                # ── Scene audio (_0=narration, _1=dialogue) ──
                 for scene in story.scenes:
                     scene_no = scene.scene_no
-
-                    # narration audio (_0)
-                    narr_filename = f"scene_{scene_no:02d}_0.wav"
-                    narr_path = await _generate_tts_file(
-                        scene_no=scene_no,
-                        text=scene.narration,
-                        output_filename=narr_filename,
+                    tts_items.append(
+                        {
+                            "kind": "narration",
+                            "scene_no": scene_no,
+                            "text": scene.narration,
+                            "filename": f"scene_{scene_no:02d}_0.wav",
+                        }
                     )
-                    if narr_path is not None:
-                        image_delay = _wav_image_delay(narr_path)
-                        narr_delay = max(0, round(_wav_duration(narr_path)))
-                        run_state.set_scene_audio(scene_no, narr_filename, image_delay, audio_delay=narr_delay)
+                    if scene.dialogue:
+                        tts_items.append(
+                            {
+                                "kind": "dialogue",
+                                "scene_no": scene_no,
+                                "text": scene.dialogue,
+                                "filename": f"scene_{scene_no:02d}_1.wav",
+                            }
+                        )
+
+                print(f"[MASTER TTS BATCH] start count={len(tts_items)}")
+                for pos, item in enumerate(tts_items, start=1):
+                    scene_no = int(item["scene_no"])
+                    filename = str(item["filename"])
+                    kind = str(item["kind"])
+                    print(f"[MASTER TTS BATCH] generating {pos}/{len(tts_items)} {filename}")
+                    audio_path = await _generate_tts_file(
+                        scene_no=scene_no,
+                        text=str(item["text"]),
+                        output_filename=filename,
+                    )
+                    if audio_path is None:
+                        continue
+
+                    audio_delay = max(0, round(_wav_duration(audio_path)))
+                    if kind == "cover":
+                        run_state.set_cover_audio(filename, audio_delay=audio_delay)
+                        await _emit(
+                            run_state,
+                            {
+                                "cover_audio": filename,
+                                "cover_audio_url": f"/api/runs/{run_state.run_id}/audio/{filename}",
+                            },
+                        )
+                        print("[MASTER] TTS cover applied")
+                    elif kind == "narration":
+                        image_delay = _wav_image_delay(audio_path)
+                        run_state.set_scene_audio(scene_no, filename, image_delay, audio_delay=audio_delay)
                         await _emit(
                             run_state,
                             {
                                 "scene_no": scene_no,
-                                "audio": narr_filename,
-                                "audio_url": f"/api/runs/{run_state.run_id}/audio/{narr_filename}",
+                                "audio": filename,
+                                "audio_url": f"/api/runs/{run_state.run_id}/audio/{filename}",
                             },
                         )
-                        print(f"[MASTER] TTS scene {scene_no} narration applied → {narr_filename}")
-
-                    # dialogue audio (_1) — dialogue가 있을 때만 생성
-                    if scene.dialogue:
-                        dial_filename = f"scene_{scene_no:02d}_1.wav"
-                        dial_path = await _generate_tts_file(
-                            scene_no=scene_no,
-                            text=scene.dialogue,
-                            output_filename=dial_filename,
+                        print(f"[MASTER] TTS scene {scene_no} narration applied -> {filename}")
+                    elif kind == "dialogue":
+                        run_state.set_scene_dialogue_audio(scene_no, filename, audio_delay=audio_delay)
+                        await _emit(
+                            run_state,
+                            {
+                                "scene_no": scene_no,
+                                "dialogue_audio": filename,
+                                "dialogue_audio_url": f"/api/runs/{run_state.run_id}/audio/{filename}",
+                            },
                         )
-                        if dial_path is not None:
-                            dial_delay = max(0, round(_wav_duration(dial_path)))
-                            run_state.set_scene_dialogue_audio(scene_no, dial_filename, audio_delay=dial_delay)
-                            await _emit(
-                                run_state,
-                                {
-                                    "scene_no": scene_no,
-                                    "dialogue_audio": dial_filename,
-                                    "dialogue_audio_url": f"/api/runs/{run_state.run_id}/audio/{dial_filename}",
-                                },
-                            )
-                            print(f"[MASTER] TTS scene {scene_no} dialogue applied → {dial_filename}")
+                        print(f"[MASTER] TTS scene {scene_no} dialogue applied -> {filename}")
             finally:
                 await loop.run_in_executor(None, unload_model)
                 print(f"[MASTER] TTS unload done (all local TTS in {time.time() - tts_started_at:.1f}s)")
@@ -290,29 +304,35 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                         scene_outputs.append((scene_no, idx, stem, filename))
 
                 t0 = time.time()
-                print(f"[WORKER] Sending image batch to 5080 count={len(image_items)}")
-                image_bytes_by_stem = await worker.generate_image_batch(image_items)
-                print(f"[WORKER] Image batch received in {time.time() - t0:.1f}s")
-                cover_path = run_dir / "images" / cover_filename
-                cover_path.parent.mkdir(parents=True, exist_ok=True)
-                cover_path.write_bytes(image_bytes_by_stem["cover"])
-                run_state.set_cover_image(cover_filename)
-                await _emit(
-                    run_state,
-                    {
-                        "cover_image": cover_filename,
-                        "cover_image_url": f"/api/runs/{run_state.run_id}/images/{cover_filename}",
-                    },
-                )
-                print("[WORKER] cover done")
-
+                scene_output_by_stem = {
+                    stem: (scene_no, idx, filename)
+                    for scene_no, idx, stem, filename in scene_outputs
+                }
                 emitted_scene_no = None
-                for scene_no, idx, stem, filename in scene_outputs:
+                print(f"[WORKER] Streaming image batch from 5080 count={len(image_items)}")
+                async for stem, img_bytes in worker.stream_image_batch(image_items):
+                    if stem == "cover":
+                        cover_path = run_dir / "images" / cover_filename
+                        cover_path.parent.mkdir(parents=True, exist_ok=True)
+                        cover_path.write_bytes(img_bytes)
+                        run_state.set_cover_image(cover_filename)
+                        await _emit(
+                            run_state,
+                            {
+                                "cover_image": cover_filename,
+                                "cover_image_url": f"/api/runs/{run_state.run_id}/images/{cover_filename}",
+                            },
+                        )
+                        print("[WORKER] cover saved from stream")
+                        continue
+
+                    scene_no, idx, filename = scene_output_by_stem[stem]
                     if emitted_scene_no is not None and emitted_scene_no != scene_no:
                         await _emit(run_state, {"scene_no": emitted_scene_no})
 
                     img_path = run_dir / "images" / filename
-                    img_path.write_bytes(image_bytes_by_stem[stem])
+                    img_path.parent.mkdir(parents=True, exist_ok=True)
+                    img_path.write_bytes(img_bytes)
                     run_state.add_scene_image(scene_no, filename)
                     await _emit(
                         run_state,
@@ -322,11 +342,12 @@ async def run_pipeline(run_id: str, registry: RunRegistry) -> None:
                             "image_url": f"/api/runs/{run_state.run_id}/images/{filename}",
                         },
                     )
-                    print(f"[WORKER] scene {scene_no} img {idx} saved from batch")
+                    print(f"[WORKER] scene {scene_no} img {idx} saved from stream")
                     emitted_scene_no = scene_no
 
                 if emitted_scene_no is not None:
                     await _emit(run_state, {"scene_no": emitted_scene_no})
+                print(f"[WORKER] Image stream finished in {time.time() - t0:.1f}s")
             finally:
                 # 워커 이미지가 끝나거나 실패하면 ComfyUI 모델까지 내려 VRAM을 반환한다.
                 await worker.free_comfyui(unload_models=True)
