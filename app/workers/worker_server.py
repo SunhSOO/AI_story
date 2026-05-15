@@ -92,6 +92,8 @@ async def image_batch_generate(req: ImageBatchRequest):
             status_code=500,
             detail=f"Image batch failed: {type(exc).__name__}: {exc}",
         ) from exc
+    finally:
+        await loop.run_in_executor(None, _free_comfyui, True)
 
     return {
         "images": [
@@ -115,50 +117,68 @@ async def image_batch_stream_generate(req: ImageBatchRequest):
 
         client = ComfyUIClient()
         batch_start = time.time()
+        current_future = None
         print(f"[WORKER IMAGE STREAM] start count={len(req.images)}")
 
-        for pos, item in enumerate(req.images, start=1):
-            item_start = time.time()
-            try:
-                print(
-                    f"[WORKER IMAGE STREAM] generating {pos}/{len(req.images)} "
-                    f"stem={item.stem} prompt_len={len(item.prompt)}"
-                )
-                future = loop.run_in_executor(
-                    None,
-                    _generate_image_bytes_with_client,
-                    item.prompt,
-                    item.seed,
-                    item.stem,
-                    client,
-                )
-                while not future.done():
-                    yield json.dumps({"ping": True, "stem": item.stem}).encode("utf-8") + b"\n"
-                    await asyncio.sleep(10)
-                img_bytes = await future
-                print(
-                    f"[WORKER IMAGE STREAM] done {pos}/{len(req.images)} "
-                    f"stem={item.stem} bytes={len(img_bytes)} "
-                    f"elapsed={time.time() - item_start:.1f}s"
-                )
-                yield json.dumps({"stem": item.stem, "bytes": len(img_bytes)}).encode("utf-8") + b"\n"
-                yield img_bytes
-                yield b"\n"
-            except Exception as exc:
-                import traceback
-                traceback.print_exc()
-                yield (
-                    json.dumps(
-                        {"error": f"{type(exc).__name__}: {exc}", "stem": item.stem}
-                    ).encode("utf-8")
-                    + b"\n"
-                )
-                return
+        try:
+            for pos, item in enumerate(req.images, start=1):
+                item_start = time.time()
+                try:
+                    print(
+                        f"[WORKER IMAGE STREAM] generating {pos}/{len(req.images)} "
+                        f"stem={item.stem} prompt_len={len(item.prompt)}"
+                    )
+                    current_future = loop.run_in_executor(
+                        None,
+                        _generate_image_bytes_with_client,
+                        item.prompt,
+                        item.seed,
+                        item.stem,
+                        client,
+                    )
+                    while not current_future.done():
+                        yield json.dumps({"ping": True, "stem": item.stem}).encode("utf-8") + b"\n"
+                        await asyncio.sleep(10)
+                    img_bytes = await current_future
+                    current_future = None
+                    print(
+                        f"[WORKER IMAGE STREAM] done {pos}/{len(req.images)} "
+                        f"stem={item.stem} bytes={len(img_bytes)} "
+                        f"elapsed={time.time() - item_start:.1f}s"
+                    )
+                    yield json.dumps({"stem": item.stem, "bytes": len(img_bytes)}).encode("utf-8") + b"\n"
+                    yield img_bytes
+                    yield b"\n"
+                except Exception as exc:
+                    current_future = None
+                    import traceback
+                    traceback.print_exc()
+                    yield (
+                        json.dumps(
+                            {"error": f"{type(exc).__name__}: {exc}", "stem": item.stem}
+                        ).encode("utf-8")
+                        + b"\n"
+                    )
+                    return
 
-        print(
-            f"[WORKER IMAGE STREAM] complete count={len(req.images)} "
-            f"elapsed={time.time() - batch_start:.1f}s"
-        )
+            print(
+                f"[WORKER IMAGE STREAM] complete count={len(req.images)} "
+                f"elapsed={time.time() - batch_start:.1f}s"
+            )
+        finally:
+            if current_future is not None and not current_future.done():
+                print("[WORKER IMAGE STREAM] waiting for active ComfyUI job before cleanup")
+                try:
+                    await current_future
+                except Exception as exc:
+                    print(f"[WORKER IMAGE STREAM] active job ended before cleanup: {exc}")
+            cleanup_start = time.time()
+            print("[WORKER IMAGE STREAM] ComfyUI cleanup start unload_models=True")
+            await loop.run_in_executor(None, _free_comfyui, True)
+            print(
+                f"[WORKER IMAGE STREAM] ComfyUI cleanup done "
+                f"elapsed={time.time() - cleanup_start:.1f}s"
+            )
 
     return StreamingResponse(_stream(), media_type="application/octet-stream")
 
@@ -528,12 +548,12 @@ def _free_comfyui(unload_models: bool = False) -> None:
     try:
         import gc
         from app.clients.comfyui_client import ComfyUIClient
-        ComfyUIClient().free_memory(unload_models=unload_models)
+        ok = ComfyUIClient().free_memory(unload_models=unload_models)
         gc.collect()
         import torch
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        print(f"[WORKER] ComfyUI VRAM freed unload_models={unload_models}")
+        print(f"[WORKER] ComfyUI VRAM free requested unload_models={unload_models} ok={ok}")
     except Exception as e:
         print(f"[WORKER] ComfyUI free: {e}")
 
@@ -577,7 +597,8 @@ def _do_cleanup(unload_comfyui_models: bool = False) -> None:
 
     try:
         from app.clients.comfyui_client import ComfyUIClient
-        ComfyUIClient().free_memory(unload_models=unload_comfyui_models)
+        ok = ComfyUIClient().free_memory(unload_models=unload_comfyui_models)
+        print(f"[CLEANUP] ComfyUI free requested unload_models={unload_comfyui_models} ok={ok}")
     except Exception as e:
         print(f"[CLEANUP] ComfyUI free: {e}")
 
