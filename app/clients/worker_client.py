@@ -8,6 +8,7 @@ _LLM_TIMEOUT = aiohttp.ClientTimeout(total=900)
 _IMG_TIMEOUT = aiohttp.ClientTimeout(total=300)
 _TTS_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=720)
 _TTS_BATCH_TIMEOUT_PER_ITEM = 180
+_STT_TIMEOUT = aiohttp.ClientTimeout(total=300, sock_connect=30)
 _CLEANUP_TIMEOUT = aiohttp.ClientTimeout(total=300)
 
 
@@ -133,6 +134,31 @@ class WorkerClient:
             narration_emotion="",
             dialogue_emotion="",
         )
+
+    async def transcribe_stt(self, audio_bytes: bytes, language: str) -> tuple[str, float]:
+        try:
+            form = aiohttp.FormData()
+            form.add_field(
+                "audio_file",
+                audio_bytes,
+                filename="recording.webm",
+                content_type="application/octet-stream",
+            )
+            form.add_field("language", language)
+
+            print(f"[MASTER STT HTTP] request bytes={len(audio_bytes)} language={language}")
+            async with aiohttp.ClientSession(timeout=_STT_TIMEOUT) as session:
+                async with session.post(f"{self.base_url}/stt/transcribe", data=form) as resp:
+                    if resp.status >= 400:
+                        body = await resp.text()
+                        raise RuntimeError(f"Worker STT HTTP {resp.status}: {body[:500]}")
+                    data = await resp.json()
+                    text = str(data.get("stt_text", ""))
+                    confidence = float(data.get("confidence", 0.0))
+                    print(f"[MASTER STT HTTP] response chars={len(text)} confidence={confidence:.2f}")
+                    return text, confidence
+        except Exception as exc:
+            raise RuntimeError(f"Worker STT request failed: {type(exc).__name__}: {exc!r}") from exc
 
     async def free_comfyui(self) -> None:
         try:

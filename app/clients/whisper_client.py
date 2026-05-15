@@ -1,6 +1,7 @@
 """Whisper STT client: converts audio bytes → text."""
 import gc
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -10,9 +11,10 @@ from app.core.exceptions import STTError
 
 
 def _convert_to_wav(src: Path, dst: Path) -> None:
-    if os.path.exists(settings.ffmpeg_path):
+    ffmpeg = settings.ffmpeg_path if os.path.exists(settings.ffmpeg_path) else shutil.which("ffmpeg")
+    if ffmpeg:
         result = subprocess.run(
-            [settings.ffmpeg_path, "-i", str(src), "-ar", "16000", "-ac", "1", "-y", str(dst)],
+            [ffmpeg, "-i", str(src), "-ar", "16000", "-ac", "1", "-y", str(dst)],
             capture_output=True,
             timeout=30,
         )
