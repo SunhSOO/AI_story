@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     workflow_path: Path = BASE_DIR / "make_panel.json"
     images_per_scene: int = 2
     image_gen_timeout: int = 300
+    comfyui_unload_models_after_run: bool = False
 
     # voxcpm2 TTS
     voxcpm2_dir: Path = BASE_DIR / "voxcpm2TTS"

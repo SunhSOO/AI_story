@@ -54,7 +54,9 @@ class ComfyUIClient:
         r.raise_for_status()
         return r.content
 
-    def free_memory(self, unload_models: bool = True) -> bool:
+    def free_memory(self, unload_models: bool | None = None) -> bool:
+        if unload_models is None:
+            unload_models = settings.comfyui_unload_models_after_run
         try:
             r = requests.post(
                 f"{self.base_url}/free",

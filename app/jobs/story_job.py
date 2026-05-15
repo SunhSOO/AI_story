@@ -71,13 +71,17 @@ async def _cleanup_system(reason: str, worker=None) -> None:
 
     try:
         from app.clients.comfyui_client import ComfyUIClient
-        await loop.run_in_executor(None, ComfyUIClient().free_memory)
+        await loop.run_in_executor(
+            None,
+            ComfyUIClient().free_memory,
+            settings.comfyui_unload_models_after_run,
+        )
     except Exception as e:
         print(f"[CLEANUP] ComfyUI: {e}")
 
     # 워커 GPU 메모리도 해제
     if worker is not None:
-        await worker.cleanup()
+        await worker.cleanup(unload_comfyui_models=settings.comfyui_unload_models_after_run)
 
     try:
         gc.collect()
