@@ -72,10 +72,17 @@ function buildSceneShells() {
           </div>
         `).join('')}
       </div>
-      <div class="audio-shell" id="scene-audio-shell-${sceneNo}">
-        <span>장면 ${sceneNo} 음성</span>
-        <audio id="scene-audio-${sceneNo}" controls hidden></audio>
-        <small id="scene-audio-status-${sceneNo}">생성 대기</small>
+      <div class="scene-audio-grid">
+        <div class="audio-shell" id="scene-audio-shell-${sceneNo}">
+          <span>장면 ${sceneNo} 내레이션</span>
+          <audio id="scene-audio-${sceneNo}" controls hidden></audio>
+          <small id="scene-audio-status-${sceneNo}">생성 대기</small>
+        </div>
+        <div class="audio-shell" id="scene-dialogue-audio-shell-${sceneNo}">
+          <span>장면 ${sceneNo} 대사</span>
+          <audio id="scene-dialogue-audio-${sceneNo}" controls hidden></audio>
+          <small id="scene-dialogue-audio-status-${sceneNo}">대사 음성 대기</small>
+        </div>
       </div>
     `;
     grid.appendChild(article);
@@ -286,12 +293,13 @@ function renderScenes(scenes) {
     const scene = scenes.find((item) => item.scene_no === sceneNo) || {};
     const scenarios = scene.scenarios || [];
 
-    // index 1: 내레이션 텍스트 + 오디오, index 3: 대사 텍스트
+    // index 1: 내레이션 텍스트 + scene_NN_0.wav, index 3: 대사 텍스트 + scene_NN_1.wav
     const narrationStep = scenarios.find((s) => s.index === 1) || {};
     const dialogueStep = scenarios.find((s) => s.index === 3) || {};
     const narration = narrationStep.msg || '';
     const dialogue = dialogueStep.msg || '';
-    const audioUrl = narrationStep.audio_url || '';
+    const narrationAudioUrl = narrationStep.audio_url || '';
+    const dialogueAudioUrl = dialogueStep.audio_url || '';
 
     setText(`scene-narration-${sceneNo}`, narration || '나레이션이 도착하면 표시됩니다.', !narration);
     setText(`scene-dialogue-${sceneNo}`, dialogue || '대사가 도착하면 표시됩니다.', !dialogue);
@@ -313,7 +321,14 @@ function renderScenes(scenes) {
       );
     }
 
-    updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, audioUrl);
+    updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, narrationAudioUrl);
+    updateAudio(
+      `scene-dialogue-audio-shell-${sceneNo}`,
+      `scene-dialogue-audio-${sceneNo}`,
+      `scene-dialogue-audio-status-${sceneNo}`,
+      dialogueAudioUrl,
+      '대사 음성 대기',
+    );
   }
 }
 
@@ -363,7 +378,7 @@ function updateImageSlot(slotId, imageId, rawUrl, placeholderText) {
   image.src = withCache(rawUrl);
 }
 
-function updateAudio(shellId, audioId, statusId, rawUrl) {
+function updateAudio(shellId, audioId, statusId, rawUrl, emptyText = '생성 대기') {
   const shell = document.getElementById(shellId);
   const audio = document.getElementById(audioId);
   const status = document.getElementById(statusId);
@@ -374,7 +389,7 @@ function updateAudio(shellId, audioId, statusId, rawUrl) {
     audio.hidden = true;
     audio.removeAttribute('src');
     audio.dataset.rawUrl = '';
-    status.textContent = '생성 대기';
+    status.textContent = emptyText;
     return;
   }
 
@@ -519,7 +534,8 @@ function eventLabel(message) {
   if (message.cover_image_url) return '표지 이미지 도착';
   if (message.cover_audio_url) return '표지 음성 도착';
   if (message.image_url && message.scene_no) return `장면 ${message.scene_no} 이미지 도착`;
-  if (message.audio_url && message.scene_no) return `장면 ${message.scene_no} 음성 도착`;
+  if (message.audio_url && message.scene_no) return `장면 ${message.scene_no} 내레이션 음성 도착`;
+  if (message.dialogue_audio_url && message.scene_no) return `장면 ${message.scene_no} 대사 음성 도착`;
   if (message.scene_no) return `장면 ${message.scene_no} 갱신`;
   return STAGE_LABELS[message.stage] || '상태 갱신';
 }
@@ -551,6 +567,16 @@ function applyEventHint(message) {
 
   if (message.audio_url) {
     updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, message.audio_url);
+  }
+
+  if (message.dialogue_audio_url) {
+    updateAudio(
+      `scene-dialogue-audio-shell-${sceneNo}`,
+      `scene-dialogue-audio-${sceneNo}`,
+      `scene-dialogue-audio-status-${sceneNo}`,
+      message.dialogue_audio_url,
+      '대사 음성 대기',
+    );
   }
 }
 
@@ -594,6 +620,13 @@ function resetRunUI() {
       updateImageSlot(`panel-slot-${sceneNo}-${panel}`, `panel-image-${sceneNo}-${panel}`, '', `패널 ${panel} 대기`);
     }
     updateAudio(`scene-audio-shell-${sceneNo}`, `scene-audio-${sceneNo}`, `scene-audio-status-${sceneNo}`, '');
+    updateAudio(
+      `scene-dialogue-audio-shell-${sceneNo}`,
+      `scene-dialogue-audio-${sceneNo}`,
+      `scene-dialogue-audio-status-${sceneNo}`,
+      '',
+      '대사 음성 대기',
+    );
   }
 
   document.querySelectorAll('.pipeline li').forEach((item) => {
