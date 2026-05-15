@@ -160,10 +160,13 @@ class WorkerClient:
         except Exception as exc:
             raise RuntimeError(f"Worker STT request failed: {type(exc).__name__}: {exc!r}") from exc
 
-    async def free_comfyui(self) -> None:
+    async def free_comfyui(self, unload_models: bool = False) -> None:
         try:
             async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:
-                async with session.post(f"{self.base_url}/comfyui/free") as resp:
+                async with session.post(
+                    f"{self.base_url}/comfyui/free",
+                    json={"unload_models": unload_models},
+                ) as resp:
                     resp.raise_for_status()
         except Exception as e:
             print(f"[WORKER COMFYUI FREE] {e}")
@@ -176,10 +179,13 @@ class WorkerClient:
                     raise RuntimeError(f"Worker TTS unload HTTP {resp.status}: {body[:500]}")
                 print("[WORKER TTS UNLOAD] ok")
 
-    async def cleanup(self) -> None:
+    async def cleanup(self, unload_comfyui_models: bool = False) -> None:
         try:
             async with aiohttp.ClientSession(timeout=_CLEANUP_TIMEOUT) as session:
-                async with session.post(f"{self.base_url}/cleanup") as resp:
+                async with session.post(
+                    f"{self.base_url}/cleanup",
+                    json={"unload_comfyui_models": unload_comfyui_models},
+                ) as resp:
                     resp.raise_for_status()
         except Exception as e:
             print(f"[WORKER CLEANUP] {e}")

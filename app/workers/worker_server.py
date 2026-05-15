@@ -36,6 +36,14 @@ class TTSBatchRequest(BaseModel):
     items: list[TTSRequest]
 
 
+class ComfyUIFreeRequest(BaseModel):
+    unload_models: bool = False
+
+
+class CleanupRequest(BaseModel):
+    unload_comfyui_models: bool = False
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -252,16 +260,18 @@ async def tts_unload():
 
 
 @app.post("/comfyui/free")
-async def comfyui_free():
+async def comfyui_free(req: ComfyUIFreeRequest | None = None):
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _free_comfyui)
+    unload_models = req.unload_models if req is not None else False
+    await loop.run_in_executor(None, _free_comfyui, unload_models)
     return {"status": "ok"}
 
 
 @app.post("/cleanup")
-async def cleanup():
+async def cleanup(req: CleanupRequest | None = None):
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _do_cleanup)
+    unload_comfyui_models = req.unload_comfyui_models if req is not None else False
+    await loop.run_in_executor(None, _do_cleanup, unload_comfyui_models)
     return {"status": "ok"}
 
 
@@ -375,16 +385,16 @@ def _generate_tts_bytes_batch_split(items: list) -> dict:
     return results
 
 
-def _free_comfyui() -> None:
+def _free_comfyui(unload_models: bool = False) -> None:
     try:
         import gc
         from app.clients.comfyui_client import ComfyUIClient
-        ComfyUIClient().free_memory()
+        ComfyUIClient().free_memory(unload_models=unload_models)
         gc.collect()
         import torch
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        print("[WORKER] ComfyUI VRAM freed")
+        print(f"[WORKER] ComfyUI VRAM freed unload_models={unload_models}")
     except Exception as e:
         print(f"[WORKER] ComfyUI free: {e}")
 
@@ -418,14 +428,14 @@ def _cleanup_llm() -> None:
         print(f"[CLEANUP] LLM torch: {e}")
 
 
-def _do_cleanup() -> None:
+def _do_cleanup(unload_comfyui_models: bool = False) -> None:
     _cleanup_llm()
 
     _unload_tts()
 
     try:
         from app.clients.comfyui_client import ComfyUIClient
-        ComfyUIClient().free_memory()
+        ComfyUIClient().free_memory(unload_models=unload_comfyui_models)
     except Exception as e:
         print(f"[CLEANUP] ComfyUI free: {e}")
 
