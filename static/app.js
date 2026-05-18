@@ -13,7 +13,6 @@ const STAGE_LABELS = {
   LLM: '이야기 생성',
   TTS: '음성 생성',
   IMAGE: '이미지 생성',
-  PARALLEL: '음성/이미지 병렬 생성',
 };
 
 const state = {
@@ -241,8 +240,8 @@ function renderRun(data) {
 }
 
 function subtitleFor(data, counts) {
-  if (counts.story < STORY_UNITS) return '워커에서 이야기 구조와 장면 정보를 생성하고 있습니다.';
-  if (counts.image < IMAGE_UNITS && counts.audio < AUDIO_UNITS) return '음성과 이미지가 병렬로 생성되는 중입니다.';
+  if (counts.story < STORY_UNITS) return '마스터 서버에서 이야기 구조와 장면 정보를 생성하고 있습니다.';
+  if (counts.image < IMAGE_UNITS && counts.audio < AUDIO_UNITS) return '음성과 이미지가 순서대로 생성되는 중입니다.';
   if (counts.image < IMAGE_UNITS) return '남은 이미지가 도착하는 순서대로 채워집니다.';
   if (counts.audio < AUDIO_UNITS) return '남은 음성이 도착하는 순서대로 연결됩니다.';
   return '모든 결과가 준비되었습니다.';

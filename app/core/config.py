@@ -1,5 +1,6 @@
 """Central configuration loaded from environment variables."""
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,9 +14,9 @@ def _resolve_llama_cli() -> Path:
         BASE_DIR / "llama.cpp" / "build" / "bin" / "llama-cli.exe",
         BASE_DIR / "llama.cpp" / "build" / "bin" / "Debug" / "llama-cli.exe",
     ]
-    for p in candidates:
-        if p.is_file():
-            return p
+    for path in candidates:
+        if path.is_file():
+            return path
     return candidates[0]
 
 
@@ -47,11 +48,13 @@ class Settings(BaseSettings):
     comfyui_url: str = "http://127.0.0.1:8188"
     comfyui_output_dir: Path = BASE_DIR / "ComfyUI" / "output"
     workflow_path: Path = BASE_DIR / "make_panel.json"
+    image_width: int = 1280
+    image_height: int = 720
     images_per_scene: int = 2
     image_gen_timeout: int = 400
     comfyui_unload_models_after_run: bool = False
 
-    # voxcpm2 TTS
+    # VoxCPM2 TTS
     voxcpm2_dir: Path = BASE_DIR / "voxcpm2TTS"
     tts_reference_wav: Path = BASE_DIR / "voxcpm2TTS" / "reference_speaker.mp3"
     tts_cfg_value: float = 1.0
@@ -64,9 +67,6 @@ class Settings(BaseSettings):
     # Whisper STT
     whisper_model: str = "medium"
     ffmpeg_path: str = r"C:\ffmpeg\bin\ffmpeg.exe"
-
-    # Worker (5080) — LLM + designated images
-    worker_url: str = "http://127.0.0.1:8001"
 
     # Server
     outputs_dir: Path = BASE_DIR / "outputs" / "runs"

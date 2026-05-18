@@ -155,8 +155,8 @@ def build_api_workflow(workflow: dict, positive_prompt: str, seed: int, filename
 
         elif ntype == "EmptyLatentImage":
             api_node["inputs"].update({
-                "width": widgets[0] if widgets else 1024,
-                "height": widgets[1] if len(widgets) > 1 else 1024,
+                "width": settings.image_width,
+                "height": settings.image_height,
                 "batch_size": widgets[2] if len(widgets) > 2 else 1,
             })
 

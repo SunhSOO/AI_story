@@ -17,7 +17,6 @@ class RunStage(str, Enum):
     LLM = "LLM"
     IMAGE = "IMAGE"
     TTS = "TTS"
-    PARALLEL = "PARALLEL"
 
 
 class CreateRunRequest(BaseModel):

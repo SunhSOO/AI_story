@@ -431,8 +431,9 @@
     <div class="callout info">
       <span class="callout-icon">ℹ️</span>
       <p><strong>파이프라인 구조</strong><br>
-        Stage 1 (LLM): 워커(RTX 5080)에서 story.json 생성<br>
-        Stage 2 (PARALLEL): 워커가 TTS 배치 + 씬 2·3 이미지, 마스터(RTX 3080 Ti)가 표지 + 씬 1·4 이미지 동시 생성
+        Stage 1 (LLM): 마스터 서버에서 story.json 생성<br>
+        Stage 2 (TTS): 마스터 서버에서 음성 생성 후 VRAM 해제<br>
+        Stage 3 (IMAGE): 마스터 서버에서 1280x720 이미지 9장 생성 후 VRAM 해제
       </p>
     </div>
 
@@ -491,7 +492,7 @@
         <tr><th>필드</th><th>타입</th><th>설명</th></tr>
         <tr><td><code>run_id</code></td><td>string</td><td>작업 ID</td></tr>
         <tr><td><code>status</code></td><td>string</td><td><code>QUEUED</code> / <code>RUNNING</code> / <code>DONE</code> / <code>FAILED</code></td></tr>
-        <tr><td><code>stage</code></td><td>string</td><td><code>LLM</code> / <code>PARALLEL</code> / <code>IMAGE</code></td></tr>
+        <tr><td><code>stage</code></td><td>string</td><td><code>LLM</code> / <code>TTS</code> / <code>IMAGE</code></td></tr>
         <tr><td><code>story_title</code></td><td>string</td><td>동화 제목. LLM 완료 전 빈 문자열</td></tr>
         <tr><td><code>cover</code></td><td>object</td><td>표지 정보. 항상 존재 (scenarios 2개)</td></tr>
         <tr><td><code>scenes</code></td><td>array</td><td>씬 목록. LLM 완료 후 4개 고정</td></tr>
@@ -588,22 +589,22 @@
 data: {"run_id":"...","status":"RUNNING","stage":"LLM"}
 
 event: update
-data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL"}
+data: {"run_id":"...","status":"RUNNING","stage":"TTS"}
 
 event: update
-data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","cover_audio_url":"/api/runs/.../audio/cover.wav"}
+data: {"run_id":"...","status":"RUNNING","stage":"TTS","cover_audio_url":"/api/runs/.../audio/cover.wav"}
 
 event: update
-data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","scene_no":1,"audio_url":"/api/runs/.../audio/scene_01_0.wav"}
+data: {"run_id":"...","status":"RUNNING","stage":"TTS","scene_no":1,"audio_url":"/api/runs/.../audio/scene_01_0.wav"}
 
 event: update
-data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","scene_no":1,"dialogue_audio_url":"/api/runs/.../audio/scene_01_1.wav"}
+data: {"run_id":"...","status":"RUNNING","stage":"TTS","scene_no":1,"dialogue_audio_url":"/api/runs/.../audio/scene_01_1.wav"}
 
 event: update
-data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","cover_image_url":"/api/runs/.../images/cover.png"}
+data: {"run_id":"...","status":"RUNNING","stage":"IMAGE","cover_image_url":"/api/runs/.../images/cover.png"}
 
 event: update
-data: {"run_id":"...","status":"RUNNING","stage":"PARALLEL","scene_no":2,"image_url":"/api/runs/.../images/scene_02_img_01.png"}
+data: {"run_id":"...","status":"RUNNING","stage":"IMAGE","scene_no":2,"image_url":"/api/runs/.../images/scene_02_img_01.png"}
 
 event: update
 data: {"run_id":"...","status":"DONE","stage":"IMAGE"}
@@ -674,8 +675,7 @@ scene_01_img_01.png  ~  scene_04_img_02.png</code></pre>
     <div class="table-wrap">
       <table>
         <tr><th>처리 위치</th><th>파일명</th></tr>
-        <tr><td>마스터 (RTX 3080 Ti)</td><td>cover.png, scene_01_img_01/02.png, scene_04_img_01/02.png</td></tr>
-        <tr><td>워커 (RTX 5080)</td><td>scene_02_img_01/02.png, scene_03_img_01/02.png</td></tr>
+        <tr><td>마스터 서버</td><td>cover.png, scene_01_img_01.png ~ scene_04_img_02.png</td></tr>
       </table>
     </div>
 

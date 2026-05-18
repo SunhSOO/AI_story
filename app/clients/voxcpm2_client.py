@@ -152,7 +152,7 @@ def get_tts_executor() -> concurrent.futures.ThreadPoolExecutor:
     with _tts_executor_lock:
         if _tts_executor is None:
             _tts_executor = concurrent.futures.ThreadPoolExecutor(
-                max_workers=1, thread_name_prefix="tts-worker"
+                max_workers=1, thread_name_prefix="tts"
             )
     return _tts_executor
 
@@ -164,7 +164,7 @@ def reset_tts_executor() -> None:
     with _tts_executor_lock:
         old_executor = _tts_executor
         _tts_executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="tts-worker"
+            max_workers=1, thread_name_prefix="tts"
         )
         _tts_warmed_up = False
     if old_executor is not None:
